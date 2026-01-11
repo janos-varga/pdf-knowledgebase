@@ -10,6 +10,7 @@ Provides high-level interface for:
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import chromadb
 from chromadb.config import Settings
@@ -80,7 +81,7 @@ class ChromaDBClient:
                 metadata={
                     "hnsw:space": "cosine",  # Cosine similarity for embeddings
                     "description": "Electrical component datasheets for PCB design",
-                    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+                    "embedding_model": "all-MiniLM-L6-v2",
                     "embedding_dimensions": 384,
                     "chunking_strategy": "two-stage-semantic",
                     "chunk_size_target": 1500,
@@ -207,7 +208,7 @@ class ChromaDBClient:
                 f"Failed to delete datasheet '{datasheet_name}': {e}"
             ) from e
 
-    def get_collection_info(self) -> dict[str, any]:
+    def get_collection_info(self) -> dict[str, Any]:
         """
         Get collection metadata and statistics.
 

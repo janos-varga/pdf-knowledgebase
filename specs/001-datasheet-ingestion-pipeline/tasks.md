@@ -24,7 +24,7 @@
 - [X] T001 Create project directory structure: src/ingestion/, src/models/, src/cli/, src/utils/, tests/unit/, tests/integration/, tests/fixtures/
 - [X] T002 Initialize Python project with uv: create pyproject.toml with build configuration and dependencies (migrate from requirements.txt)
 - [X] T003 Install PyTorch CPU-only: uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-- [X] T004 Install core dependencies with uv: uv pip install chromadb langchain langchain-chroma langchain-community langchain_text_splitters sentence-transformers pytest pytest-cov markdown python-dotenv pyyaml
+- [X] T004 Install core dependencies with uv: uv pip install chromadb langchain langchain-chroma langchain-community langchain_text_splitters sentence-transformers pytest pytest-cov markdown
 - [X] T005 [P] Create empty __init__.py files in all source packages: src/__init__.py, src/ingestion/__init__.py, src/models/__init__.py, src/cli/__init__.py, src/utils/__init__.py
 - [X] T006 [P] Create .logs/ directory for structured JSON logging output
 - [X] T007 [P] Create ChromaDB default directory: D:\.cache\chromadb (Windows-specific path)

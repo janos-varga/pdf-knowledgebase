@@ -17,7 +17,7 @@ Build a LangChain-based CLI ingestion pipeline for electrical component datashee
 - **LangChain**: langchain, langchain-community, langchain-chroma, langchain_text_splitters
 - **ChromaDB**: chromadb (vector database with persistent storage)
 - **Embeddings**: sentence-transformers (CPU-optimized), torch (CPU-only build)
-- **CLI/Utilities**: argparse (stdlib), pathlib (stdlib), pyyaml, python-dotenv
+- **CLI/Utilities**: argparse (stdlib), pathlib (stdlib)
 - **Markdown**: markdown (parsing library)
 - **Testing**: pytest, pytest-cov
 - **Installation Note**: PyTorch CPU-only via `pip install torch --index-url https://download.pytorch.org/whl/cpu`

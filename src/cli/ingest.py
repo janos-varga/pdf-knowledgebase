@@ -47,19 +47,23 @@ def parse_arguments() -> argparse.Namespace:
         Parsed arguments namespace
     """
     parser = argparse.ArgumentParser(
-        prog="python -m src.cli.ingest",
+        prog="datasheet-ingest",
         description="Ingest electrical component datasheets into ChromaDB for AI-assisted queries",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Ingest all datasheets in folder
+  # Using main.py (recommended)
+  python main.py D:\\datasheets\\components
+  uv run main.py D:\\datasheets\\components
+
+  # Using module directly
   python -m src.cli.ingest D:\\datasheets\\components
 
   # Force update existing datasheets
-  python -m src.cli.ingest D:\\datasheets\\components --force-update
+  python main.py D:\\datasheets\\components --force-update
 
   # Set custom log level
-  python -m src.cli.ingest D:\\datasheets\\components --log-level DEBUG
+  python main.py D:\\datasheets\\components --log-level DEBUG
 
 Environment Variables:
   CHROMADB_PATH          Path to ChromaDB storage (default: D:\\.cache\\chromadb)

@@ -28,32 +28,12 @@ This pipeline enables engineers to build a searchable knowledge base of componen
 
 ### 1. Clone the Repository
 
-```bash
-git clone <repository-url>
-cd pdf-knowledgebase
-```
-
 ### 2. Install uv (if not already installed)
-
-```bash
-# Windows (PowerShell)
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Linux/macOS
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
 ### 3. Install Dependencies
 
 ```bash
-# Install PyTorch CPU-only first (required for embeddings)
-uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-
-# Install project dependencies
-uv pip install -e .
-
-# Or install with dev dependencies
-uv pip install -e ".[dev]"
+uv sync
 ```
 
 ## Quick Start
@@ -63,7 +43,11 @@ uv pip install -e ".[dev]"
 Ingest all datasheets from a folder:
 
 ```bash
-uv run python -m src.cli.ingest D:\datasheets\components
+# Using main.py entry point (recommended)
+python main.py D:\datasheets\components
+
+# Or with uv
+uv run main.py D:\datasheets\components
 ```
 
 ### Force Update
@@ -71,7 +55,7 @@ uv run python -m src.cli.ingest D:\datasheets\components
 Re-ingest existing datasheets (deletes and re-creates chunks):
 
 ```bash
-uv run python -m src.cli.ingest D:\datasheets\components --force-update
+python main.py D:\datasheets\components --force-update
 ```
 
 ### Custom Log Level
@@ -79,7 +63,7 @@ uv run python -m src.cli.ingest D:\datasheets\components --force-update
 Set logging verbosity:
 
 ```bash
-uv run python -m src.cli.ingest D:\datasheets\components --log-level DEBUG
+python main.py D:\datasheets\components --log-level DEBUG
 ```
 
 ## Folder Structure
@@ -120,7 +104,7 @@ CHROMADB_COLLECTION=my_datasheets
 
 ### ChromaDB Settings
 
-- **Storage**: Persistent at `D:\.cache\chromadb` (configurable)
+- **Storage**: Persistent at `CHROMADB_PATH` (configurable)
 - **Collection**: `datasheets` (configurable)
 - **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
 - **Similarity Metric**: Cosine similarity
@@ -140,49 +124,7 @@ CHROMADB_COLLECTION=my_datasheets
 2. **Parallel processing**: Tasks marked `[P]` can run concurrently
 3. **Incremental updates**: Use `--force-update` only when needed
 
-## Output
-
-### Console Output
-
-```
-======================================================================
-  Datasheet Ingestion Pipeline
-======================================================================
-  Datasheets Folder:  D:\datasheets\components
-  ChromaDB Path:      D:\.cache\chromadb
-  Collection:         datasheets
-  Force Update:       No
-  Log Level:          INFO
-======================================================================
-
-Discovering datasheets...
-Found 2 datasheets
-
-Initializing ChromaDB...
-ChromaDB initialized successfully
-
-Starting batch ingestion...
-
-[1/2] TL072: Processing...
-  ✅ Success: 9 chunks, 1.56s
-[2/2] LM358: Processing...
-  ✅ Success: 12 chunks, 1.96s
-
-============================================================
-Ingestion Batch Summary
-============================================================
-Total Datasheets: 2
-  ✅ Successful: 2
-  ⏭️  Skipped: 0
-  ❌ Failed: 0
-
-Total Chunks Created: 21
-Total Duration: 3.52 seconds
-Success Rate: 100.0%
-============================================================
-```
-
-### Log Files
+## Logging
 
 Structured JSON logs are saved to `.logs/ingestion_{timestamp}.json`:
 
@@ -199,41 +141,6 @@ Structured JSON logs are saved to `.logs/ingestion_{timestamp}.json`:
 }
 ```
 
-## Error Handling
-
-### Common Issues
-
-#### No datasheets found
-```
-⚠️  No datasheets found in folder.
-   Each datasheet should be in its own subfolder with one .md file.
-```
-**Solution**: Check folder structure matches requirements
-
-#### Multiple markdown files
-```
-❌ Datasheet: TL072
-   Error: Multiple .md files found in folder
-   Reason: Found TL072.md, TL072_backup.md
-   Action: Keep only one .md file per datasheet folder
-```
-**Solution**: Remove extra markdown files
-
-#### Empty markdown file
-```
-❌ Datasheet: LM358
-   Error: Markdown parsing failed
-   Reason: File is empty or contains no valid content
-   Action: Add content to the markdown file and try again
-```
-**Solution**: Add content to the markdown file
-
-#### Missing image (warning only)
-```
-⚠️  Could not resolve image path 'images/missing.png' - keeping original reference
-```
-**Solution**: Add missing image or update markdown reference
-
 ## Exit Codes
 
 - `0`: Success - all datasheets ingested successfully
@@ -241,30 +148,6 @@ Structured JSON logs are saved to `.logs/ingestion_{timestamp}.json`:
 - `2`: ChromaDB error - database connection/initialization failed
 - `3`: Ingestion error - one or more datasheets failed to ingest
 
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=src --cov-report=html
-
-# Run specific test file
-uv run pytest tests/unit/test_chunker.py
-```
-
-### Code Quality
-
-```bash
-# Lint with Ruff
-uv run ruff check src/
-
-# Format with Ruff
-uv run ruff format src/
-```
 
 ## Architecture
 
@@ -296,55 +179,6 @@ Each chunk includes:
 - `has_code_block`: Boolean flag for code block presence
 - `image_paths`: List of absolute paths to referenced images
 - `ingestion_timestamp`: ISO 8601 timestamp
-
-## Integration with Chroma MCP Server
-
-Once datasheets are ingested, query them using Chroma MCP Server:
-
-```python
-# Semantic search
-results = collection.query(
-    query_texts=["op-amp input impedance specifications"],
-    n_results=5,
-    where={"has_table": True}
-)
-
-# Get all chunks for specific datasheet
-results = collection.get(
-    where={"datasheet_name": "TL072"}
-)
-```
-
-## Troubleshooting
-
-### ChromaDB Path Not Found
-
-**Issue**: `ChromaDB path does not exist: D:\.cache\chromadb`
-
-**Solution**: The path will be created automatically. Check permissions on parent directory.
-
-### Permission Denied
-
-**Issue**: `Permission denied: cannot write to D:\.cache\chromadb`
-
-**Solution**: Run as administrator or use a different path via `CHROMADB_PATH` environment variable.
-
-### PyTorch Installation Issues
-
-**Issue**: PyTorch installs GPU version by default (large download)
-
-**Solution**: Install CPU-only version first:
-```bash
-uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 

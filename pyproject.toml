@@ -1,13 +1,9 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "pdf-knowledgebase"
 version = "0.1.0"
 description = "LangChain-based CLI ingestion pipeline for electrical component datasheets"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Janos Varga", email = "nottellingya@yahoo.com"}
@@ -22,27 +18,23 @@ classifiers = [
 ]
 
 dependencies = [
-    "chromadb>=0.5.0,<0.6.0",
-    "langchain>=0.3.0,<0.4.0",
-    "langchain-chroma>=0.2.0,<0.3.0",
-    "langchain-community>=0.3.0,<0.4.0",
-    "langchain-text-splitters>=0.3.0,<0.4.0",
-    "sentence-transformers>=3.0.0,<4.0.0",
-    "markdown>=3.5.0,<4.0.0",
-    "python-dotenv>=1.0.0,<2.0.0",
-    "pyyaml>=6.0.0,<7.0.0",
-    "torch>=2.9.0,<3.0.0",
+    "chromadb",
+    "langchain",
+    "langchain-chroma",
+    "langchain-community",
+    "langchain-text-splitters",
+    "sentence-transformers",
+    "markdown",
+    "torch",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest>=8.0.0,<9.0.0",
-    "pytest-cov>=4.1.0,<5.0.0",
-    "ruff>=0.1.0,<0.2.0",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.11",
 ]
 
-[project.scripts]
-ingest-datasheets = "src.cli.ingest:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -80,3 +72,4 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
+

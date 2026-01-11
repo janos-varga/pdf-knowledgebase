@@ -306,8 +306,6 @@ pathlib  # Python 3.13 has this in stdlib, but explicit for clarity
 # Additional required libraries
 sentence-transformers>=2.3.1  # For ChromaDB default embeddings (CPU-optimized)
 torch>=2.1.0  # PyTorch CPU-only (required by sentence-transformers)
-pyyaml>=6.0.1  # For configuration files (optional, future use)
-python-dotenv>=1.0.0  # For environment variable management
 pytest>=7.4.3  # Testing framework
 pytest-cov>=4.1.0  # Test coverage reporting
 markdown>=3.5.1  # Markdown parsing utilities
@@ -316,8 +314,6 @@ markdown>=3.5.1  # Markdown parsing utilities
 ### Rationale
 - **sentence-transformers**: Required for ChromaDB's default embedding function to work
 - **torch (CPU-only)**: Backend for sentence-transformers, CPU builds avoid CUDA dependencies
-- **pyyaml**: Future-proofing for configuration files (embedding model selection, chunk sizes)
-- **python-dotenv**: Manage ChromaDB path and other settings via `.env` file
 - **pytest ecosystem**: Standard Python testing tools
 - **markdown**: Helper library for markdown parsing and validation
 

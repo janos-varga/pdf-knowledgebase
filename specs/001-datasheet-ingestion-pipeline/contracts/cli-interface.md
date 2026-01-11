@@ -651,7 +651,6 @@ def validate_folder_path(path: Path) -> Path:
 - ✨ `--dry-run` flag: Preview ingestion without writing to ChromaDB
 - ✨ `--filter PATTERN` flag: Only ingest datasheets matching glob pattern
 - ✨ `--validate-only` flag: Check folder structure without ingesting
-- ✨ `--config FILE` flag: Load settings from YAML/JSON config file
 - ✨ `--parallel N` flag: Process N datasheets in parallel (requires thread-safe ChromaDB client)
 - ✨ Progress bar: Display real-time progress during batch ingestion
 - ✨ JSON output mode: `--output-format json` for machine-readable results

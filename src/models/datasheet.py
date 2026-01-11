@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from src.models import IngestionStatus
+from src.models.status import IngestionStatus
 
 
 @dataclass
