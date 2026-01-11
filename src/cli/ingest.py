@@ -14,10 +14,10 @@ import os
 import sys
 from pathlib import Path
 
-from ..ingestion.chroma_client import ChromaDBClient
-from ..ingestion.pipeline import discover_datasheets, ingest_batch
-from ..utils.logger import setup_logging
-from ..utils.validators import validate_folder_path
+from src.ingestion.chroma_client import ChromaDBClient
+from src.ingestion.pipeline import discover_datasheets, ingest_batch
+from src.utils.logger import setup_logging
+from src.utils.validators import validate_folder_path
 
 logger = logging.getLogger("datasheet_ingestion.cli")
 
@@ -122,7 +122,9 @@ def get_chromadb_config() -> tuple[Path, str]:
     return chromadb_path, collection_name
 
 
-def print_banner(args: argparse.Namespace, chromadb_path: Path, collection_name: str) -> None:
+def print_banner(
+    args: argparse.Namespace, chromadb_path: Path, collection_name: str
+) -> None:
     """
     Print CLI banner with configuration summary.
 
@@ -132,15 +134,15 @@ def print_banner(args: argparse.Namespace, chromadb_path: Path, collection_name:
         collection_name: Collection name
     """
     banner = f"""
-{'='*70}
+{"=" * 70}
   Datasheet Ingestion Pipeline
-{'='*70}
+{"=" * 70}
   Datasheets Folder:  {args.datasheets_folder_path}
   ChromaDB Path:      {chromadb_path}
   Collection:         {collection_name}
-  Force Update:       {'Yes' if args.force_update else 'No'}
+  Force Update:       {"Yes" if args.force_update else "No"}
   Log Level:          {args.log_level}
-{'='*70}
+{"=" * 70}
 """
     print(banner)
 
@@ -171,9 +173,9 @@ def print_summary(report) -> None:
 
     # Additional details for failed datasheets
     if report.failed > 0:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("Failed Datasheets - Detailed Errors:")
-        print("="*70)
+        print("=" * 70)
         for result in report.results:
             if result.is_error():
                 print(f"\n❌ {result.datasheet_name}")
@@ -182,9 +184,9 @@ def print_summary(report) -> None:
 
     # Additional details for skipped datasheets
     if report.skipped > 0:
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("Skipped Datasheets:")
-        print("="*70)
+        print("=" * 70)
         for result in report.results:
             if result.is_skipped():
                 print(f"\n⏭️  {result.datasheet_name}")
@@ -219,7 +221,9 @@ def main() -> int:
         except (FileNotFoundError, ValueError) as e:
             logger.error(f"Validation error: {e}")
             print(f"\n❌ Error: {e}")
-            print("\nPlease provide a valid folder path containing datasheet subfolders.")
+            print(
+                "\nPlease provide a valid folder path containing datasheet subfolders."
+            )
             return EXIT_VALIDATION_ERROR
 
         # Discover datasheets

@@ -10,9 +10,8 @@ Contains:
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
-from . import IngestionStatus
+from src.models import IngestionStatus
 
 
 @dataclass
@@ -38,11 +37,11 @@ class Datasheet:
     markdown_file_path: Path
     ingestion_timestamp: datetime
     status: IngestionStatus
-    image_paths: List[Path] = None
-    component_type: Optional[str] = None
-    error_message: Optional[str] = None
-    chunk_count: Optional[int] = None
-    duration_seconds: Optional[float] = None
+    image_paths: list[Path] = None
+    component_type: str | None = None
+    error_message: str | None = None
+    chunk_count: int | None = None
+    duration_seconds: float | None = None
 
     def __post_init__(self):
         """Validate datasheet attributes."""
@@ -56,7 +55,9 @@ class Datasheet:
             raise NotADirectoryError(f"Path is not a directory: {self.folder_path}")
 
         if not self.markdown_file_path.exists():
-            raise FileNotFoundError(f"Markdown file not found: {self.markdown_file_path}")
+            raise FileNotFoundError(
+                f"Markdown file not found: {self.markdown_file_path}"
+            )
 
         if self.markdown_file_path.suffix.lower() != ".md":
             raise ValueError(f"File is not markdown: {self.markdown_file_path}")
@@ -65,7 +66,9 @@ class Datasheet:
             self.image_paths = []
 
     @classmethod
-    def from_folder(cls, folder_path: Path, ingestion_timestamp: datetime = None) -> "Datasheet":
+    def from_folder(
+        cls, folder_path: Path, ingestion_timestamp: datetime = None
+    ) -> "Datasheet":
         """
         Create Datasheet from folder path.
 
@@ -99,7 +102,9 @@ class Datasheet:
         if len(md_files) == 0:
             raise FileNotFoundError(f"No markdown file found in {folder_path}")
         if len(md_files) > 1:
-            raise ValueError(f"Multiple markdown files found in {folder_path}: {md_files}")
+            raise ValueError(
+                f"Multiple markdown files found in {folder_path}: {md_files}"
+            )
 
         markdown_file_path = md_files[0]
 
@@ -138,9 +143,9 @@ class IngestionResult:
     datasheet_name: str
     status: IngestionStatus
     duration_seconds: float
-    chunks_created: Optional[int] = None
-    error_message: Optional[str] = None
-    skipped_reason: Optional[str] = None
+    chunks_created: int | None = None
+    error_message: str | None = None
+    skipped_reason: str | None = None
 
     def is_success(self) -> bool:
         """Check if ingestion was successful."""
@@ -199,7 +204,7 @@ class BatchIngestionReport:
         end_timestamp: Batch end time
     """
 
-    results: List[IngestionResult]
+    results: list[IngestionResult]
     start_timestamp: datetime
     end_timestamp: datetime
 
@@ -244,7 +249,7 @@ class BatchIngestionReport:
             return 0.0
         return (self.successful / self.total_datasheets) * 100
 
-    def exceeded_performance_targets(self) -> List[str]:
+    def exceeded_performance_targets(self) -> list[str]:
         """
         Return list of datasheets that exceeded 30-second target.
 

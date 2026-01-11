@@ -7,7 +7,6 @@ Contains:
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -35,9 +34,9 @@ class ContentChunk:
     ingestion_timestamp: str
     has_table: bool = False
     has_code_block: bool = False
-    section_heading: Optional[str] = None
-    image_paths: List[str] = field(default_factory=list)
-    source_page_hint: Optional[int] = None
+    section_heading: str | None = None
+    image_paths: list[str] = field(default_factory=list)
+    source_page_hint: int | None = None
 
     def __post_init__(self):
         """Validate chunk attributes and auto-detect metadata."""
@@ -69,7 +68,9 @@ class ContentChunk:
         """
         # Markdown table pattern: lines with pipes
         lines = self.text.split("\n")
-        table_lines = [line for line in lines if "|" in line and line.strip().startswith("|")]
+        table_lines = [
+            line for line in lines if "|" in line and line.strip().startswith("|")
+        ]
         return len(table_lines) >= 2  # At least header + one row
 
     def _contains_code_block(self) -> bool:
@@ -81,7 +82,7 @@ class ContentChunk:
         """
         return "```" in self.text or "~~~" in self.text
 
-    def _extract_section_heading(self) -> Optional[str]:
+    def _extract_section_heading(self) -> str | None:
         """
         Extract first markdown heading from chunk.
 
@@ -96,7 +97,7 @@ class ContentChunk:
                 return heading[:100]  # Limit heading length
         return None
 
-    def to_chromadb_format(self) -> Tuple[str, dict]:
+    def to_chromadb_format(self) -> tuple[str, dict]:
         """
         Convert chunk to ChromaDB format.
 

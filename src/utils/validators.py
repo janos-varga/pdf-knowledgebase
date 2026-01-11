@@ -6,17 +6,34 @@ Validates folder paths, datasheet folder structure, and file permissions.
 
 import re
 from pathlib import Path
-from typing import List, Tuple, Optional
-
 
 # Windows reserved characters in file/folder names
 WINDOWS_RESERVED_CHARS = r'[<>:"|?*]'
 
 # Windows reserved filenames
 WINDOWS_RESERVED_NAMES = {
-    "CON", "PRN", "AUX", "NUL",
-    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
 }
 
 
@@ -26,7 +43,7 @@ class ValidationError(Exception):
     pass
 
 
-def validate_folder_path(folder_path: Path) -> Tuple[bool, Optional[str]]:
+def validate_folder_path(folder_path: Path) -> tuple[bool, str | None]:
     """
     Validate that a folder path exists and is accessible.
 
@@ -67,7 +84,9 @@ def validate_folder_path(folder_path: Path) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
-def validate_datasheet_folder(folder_path: Path) -> Tuple[bool, Optional[str], Optional[Path]]:
+def validate_datasheet_folder(
+    folder_path: Path,
+) -> tuple[bool, str | None, Path | None]:
     """
     Validate that a folder contains exactly one .md file.
 
@@ -97,7 +116,11 @@ def validate_datasheet_folder(folder_path: Path) -> Tuple[bool, Optional[str], O
 
     if len(md_files) > 1:
         file_names = ", ".join(f.name for f in md_files)
-        return False, f"Multiple .md files found in folder {folder_path}: {file_names}", None
+        return (
+            False,
+            f"Multiple .md files found in folder {folder_path}: {file_names}",
+            None,
+        )
 
     markdown_file = md_files[0]
 
@@ -119,7 +142,7 @@ def validate_datasheet_folder(folder_path: Path) -> Tuple[bool, Optional[str], O
     return True, None, markdown_file
 
 
-def check_special_characters(folder_name: str) -> List[str]:
+def check_special_characters(folder_name: str) -> list[str]:
     """
     Check for special characters that may cause issues on Windows.
 
@@ -153,7 +176,7 @@ def check_special_characters(folder_name: str) -> List[str]:
     return warnings
 
 
-def validate_image_path(image_path: Path) -> Tuple[bool, Optional[str]]:
+def validate_image_path(image_path: Path) -> tuple[bool, str | None]:
     """
     Validate that an image file exists and is accessible.
 
@@ -190,7 +213,7 @@ def validate_image_path(image_path: Path) -> Tuple[bool, Optional[str]]:
     return True, None
 
 
-def discover_datasheets(root_folder: Path) -> List[Path]:
+def discover_datasheets(root_folder: Path) -> list[Path]:
     """
     Discover all datasheet folders in a root directory.
 
@@ -221,8 +244,8 @@ def discover_datasheets(root_folder: Path) -> List[Path]:
                 datasheet_folders.append(subfolder)
 
     except PermissionError as e:
-        raise ValidationError(f"Permission denied scanning {root_folder}: {e}")
+        raise ValidationError(f"Permission denied scanning {root_folder}: {e}") from e
     except OSError as e:
-        raise ValidationError(f"Error scanning {root_folder}: {e}")
+        raise ValidationError(f"Error scanning {root_folder}: {e}") from e
 
     return datasheet_folders

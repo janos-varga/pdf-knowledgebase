@@ -10,7 +10,6 @@ Provides functions to:
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger("datasheet_ingestion.markdown_parser")
 
@@ -53,7 +52,7 @@ def parse_markdown_file(markdown_path: Path) -> str:
             e.start,
             e.end,
             f"Cannot decode {markdown_path} as UTF-8: {e.reason}",
-        )
+        ) from e
 
     # Validate content is not empty
     if not content.strip():
@@ -70,7 +69,7 @@ def resolve_image_path(
     image_ref: str,
     markdown_path: Path,
     folder_path: Path,
-) -> Optional[Path]:
+) -> Path | None:
     """
     Resolve relative image path to absolute Windows path.
 
@@ -89,7 +88,7 @@ def resolve_image_path(
         Absolute path to image file, or None if resolution fails
 
     Examples:
-        >>> resolve_image_path("images/pinout.png", 
+        >>> resolve_image_path("images/pinout.png",
         ...     Path("D:/datasheets/TL072/TL072.md"),
         ...     Path("D:/datasheets/TL072"))
         WindowsPath('D:/datasheets/TL072/images/pinout.png')
@@ -121,9 +120,7 @@ def resolve_image_path(
         resolved_path = (markdown_dir / image_path).resolve()
 
         if resolved_path.exists():
-            logger.debug(
-                f"Resolved image path relative to markdown: {resolved_path}"
-            )
+            logger.debug(f"Resolved image path relative to markdown: {resolved_path}")
             return resolved_path
 
         # Try resolving relative to datasheet folder root
@@ -147,7 +144,7 @@ def resolve_image_path(
         return None
 
 
-def extract_image_references(content: str) -> List[str]:
+def extract_image_references(content: str) -> list[str]:
     """
     Extract all image references from markdown content.
 
@@ -183,7 +180,7 @@ def resolve_all_image_paths(
     content: str,
     markdown_path: Path,
     folder_path: Path,
-) -> Tuple[str, List[Path]]:
+) -> tuple[str, list[Path]]:
     """
     Resolve all image paths in markdown content to absolute paths.
 
@@ -228,8 +225,8 @@ def resolve_all_image_paths(
 
             # Replace relative path with absolute path in content
             # Use regex to ensure we only replace within image syntax
-            pattern = rf'(!\[[^\]]*\]\(){re.escape(image_ref)}(\))'
-            replacement = rf'\1{resolved_path}\2'
+            pattern = rf"(!\[[^\]]*\]\(){re.escape(image_ref)}(\))"
+            replacement = rf"\1{resolved_path}\2"
             updated_content = re.sub(pattern, replacement, updated_content)
 
             logger.debug(f"Replaced '{image_ref}' with '{resolved_path}'")
@@ -246,7 +243,7 @@ def resolve_all_image_paths(
     return updated_content, resolved_paths
 
 
-def validate_markdown_structure(content: str) -> Dict[str, bool]:
+def validate_markdown_structure(content: str) -> dict[str, bool]:
     """
     Validate markdown structure and report issues.
 
@@ -276,7 +273,9 @@ def validate_markdown_structure(content: str) -> Dict[str, bool]:
     # Check for malformed tables (basic check)
     if validation["has_tables"]:
         lines = content.split("\n")
-        table_lines = [line for line in lines if "|" in line and line.strip().startswith("|")]
+        table_lines = [
+            line for line in lines if "|" in line and line.strip().startswith("|")
+        ]
 
         if table_lines:
             # Check if table rows have consistent pipe counts

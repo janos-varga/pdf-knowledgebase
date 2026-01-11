@@ -10,12 +10,11 @@ Provides high-level interface for:
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import chromadb
 from chromadb.config import Settings
 
-from ..models import ContentChunk
+from src.models import ContentChunk
 
 logger = logging.getLogger("datasheet_ingestion.chroma_client")
 
@@ -33,8 +32,8 @@ class ChromaDBClient:
 
     def __init__(
         self,
-        chromadb_path: Optional[Path] = None,
-        collection_name: Optional[str] = None,
+        chromadb_path: Path | None = None,
+        collection_name: str | None = None,
     ):
         """
         Initialize ChromaDB client.
@@ -60,7 +59,7 @@ class ChromaDBClient:
             )
             logger.info(f"ChromaDB client initialized at {self.chromadb_path}")
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize ChromaDB client: {e}")
+            raise RuntimeError(f"Failed to initialize ChromaDB client: {e}") from e
 
         # Get or create collection
         self.collection = self._initialize_collection()
@@ -99,9 +98,11 @@ class ChromaDBClient:
             return collection
 
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize collection '{self.collection_name}': {e}")
+            raise RuntimeError(
+                f"Failed to initialize collection '{self.collection_name}': {e}"
+            ) from e
 
-    def insert_chunks(self, chunks: List[ContentChunk]) -> int:
+    def insert_chunks(self, chunks: list[ContentChunk]) -> int:
         """
         Insert content chunks into ChromaDB with embeddings.
 
@@ -144,7 +145,7 @@ class ChromaDBClient:
             return len(chunks)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to insert chunks into ChromaDB: {e}")
+            raise RuntimeError(f"Failed to insert chunks into ChromaDB: {e}") from e
 
     def datasheet_exists(self, datasheet_name: str) -> bool:
         """
@@ -186,9 +187,7 @@ class ChromaDBClient:
         """
         try:
             # Get all chunks for this datasheet
-            results = self.collection.get(
-                where={"datasheet_name": datasheet_name}
-            )
+            results = self.collection.get(where={"datasheet_name": datasheet_name})
 
             chunk_ids = results["ids"]
             if not chunk_ids:
@@ -198,13 +197,17 @@ class ChromaDBClient:
             # Delete chunks
             self.collection.delete(ids=chunk_ids)
 
-            logger.info(f"Deleted {len(chunk_ids)} chunks for datasheet '{datasheet_name}'")
+            logger.info(
+                f"Deleted {len(chunk_ids)} chunks for datasheet '{datasheet_name}'"
+            )
             return len(chunk_ids)
 
         except Exception as e:
-            raise RuntimeError(f"Failed to delete datasheet '{datasheet_name}': {e}")
+            raise RuntimeError(
+                f"Failed to delete datasheet '{datasheet_name}': {e}"
+            ) from e
 
-    def get_collection_info(self) -> Dict[str, any]:
+    def get_collection_info(self) -> dict[str, any]:
         """
         Get collection metadata and statistics.
 
@@ -230,7 +233,7 @@ class ChromaDBClient:
                 "error": str(e),
             }
 
-    def validate_connection(self) -> Tuple[bool, Optional[str]]:
+    def validate_connection(self) -> tuple[bool, str | None]:
         """
         Validate ChromaDB connection and permissions.
 

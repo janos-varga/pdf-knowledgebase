@@ -9,8 +9,6 @@ Ensures tables and code blocks remain intact within single chunks.
 """
 
 import logging
-import re
-from typing import List, Optional
 
 from langchain_text_splitters import (
     ExperimentalMarkdownSyntaxTextSplitter,
@@ -62,7 +60,13 @@ class SemanticChunker:
         self.char_splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
-            separators=["\n\n", "\n", ". ", " ", ""],  # Prefer paragraph/sentence breaks
+            separators=[
+                "\n\n",
+                "\n",
+                ". ",
+                " ",
+                "",
+            ],  # Prefer paragraph/sentence breaks
             length_function=len,
         )
 
@@ -71,7 +75,7 @@ class SemanticChunker:
             f"target={chunk_size}, overlap={chunk_overlap}, max={max_chunk_size}"
         )
 
-    def chunk_markdown(self, content: str) -> List[str]:
+    def chunk_markdown(self, content: str) -> list[str]:
         """
         Chunk markdown content using two-stage semantic splitting.
 
@@ -108,7 +112,7 @@ class SemanticChunker:
 
         return final_chunks
 
-    def _stage1_markdown_split(self, content: str) -> List[str]:
+    def _stage1_markdown_split(self, content: str) -> list[str]:
         """
         Stage 1: Split markdown by syntax boundaries.
 
@@ -123,25 +127,22 @@ class SemanticChunker:
         try:
             # LangChain text splitters return Document objects, extract text
             doc_groups = self.markdown_splitter.split_text(content)
-            
+
             # Convert Document objects to strings if needed
-            if doc_groups and hasattr(doc_groups[0], 'page_content'):
+            if doc_groups and hasattr(doc_groups[0], "page_content"):
                 groups = [doc.page_content for doc in doc_groups]
             else:
                 groups = doc_groups
-            
-            logger.debug(
-                f"Stage 1 complete: {len(groups)} markdown groups created"
-            )
+
+            logger.debug(f"Stage 1 complete: {len(groups)} markdown groups created")
             return groups
         except Exception as e:
             logger.warning(
-                f"Stage 1 markdown splitting failed: {e}. "
-                f"Falling back to single group."
+                f"Stage 1 markdown splitting failed: {e}. Falling back to single group."
             )
             return [content]
 
-    def _stage2_recursive_split(self, groups: List[str]) -> List[str]:
+    def _stage2_recursive_split(self, groups: list[str]) -> list[str]:
         """
         Stage 2: Recursively split large groups while preserving structure.
 
@@ -171,18 +172,15 @@ class SemanticChunker:
                     final_chunks.extend(chunks)
                 except Exception as e:
                     logger.warning(
-                        f"Error in recursive splitting: {e}. "
-                        f"Using group as-is."
+                        f"Error in recursive splitting: {e}. Using group as-is."
                     )
                     final_chunks.append(group)
 
-        logger.debug(
-            f"Stage 2 complete: {len(final_chunks)} final chunks created"
-        )
+        logger.debug(f"Stage 2 complete: {len(final_chunks)} final chunks created")
 
         return final_chunks
 
-    def _split_with_protection(self, group: str) -> List[str]:
+    def _split_with_protection(self, group: str) -> list[str]:
         """
         Split group while protecting tables and code blocks from mid-content splits.
 
@@ -232,7 +230,7 @@ class SemanticChunker:
 
         return [group]
 
-    def _split_outside_protected_areas(self, group: str) -> List[str]:
+    def _split_outside_protected_areas(self, group: str) -> list[str]:
         """
         Attempt to split group at paragraph boundaries outside tables/code blocks.
 
@@ -266,9 +264,7 @@ class SemanticChunker:
         # Markdown table pattern: lines with pipes
         lines = text.split("\n")
         table_lines = [
-            line
-            for line in lines
-            if "|" in line and line.strip().startswith("|")
+            line for line in lines if "|" in line and line.strip().startswith("|")
         ]
         return len(table_lines) >= 2  # At least header + one row
 
@@ -284,7 +280,7 @@ class SemanticChunker:
         """
         return "```" in text or "~~~" in text
 
-    def _validate_chunks(self, chunks: List[str]) -> None:
+    def _validate_chunks(self, chunks: list[str]) -> None:
         """
         Validate chunk quality and log warnings.
 
@@ -309,14 +305,14 @@ class SemanticChunker:
 
         # Check for oversized chunks
         oversized = [
-            (i, len(c))
-            for i, c in enumerate(chunks)
-            if len(c) > self.chunk_size
+            (i, len(c)) for i, c in enumerate(chunks) if len(c) > self.chunk_size
         ]
 
         if oversized:
             # Log warnings for chunks between target and max
-            warnings = [(i, size) for i, size in oversized if size <= self.max_chunk_size]
+            warnings = [
+                (i, size) for i, size in oversized if size <= self.max_chunk_size
+            ]
             if warnings:
                 logger.warning(
                     f"Found {len(warnings)} chunks exceeding target size "
@@ -350,8 +346,8 @@ class SemanticChunker:
 
 
 def create_chunker(
-    chunk_size: Optional[int] = None,
-    chunk_overlap: Optional[int] = None,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
 ) -> SemanticChunker:
     """
     Factory function to create semantic chunker with default or custom config.

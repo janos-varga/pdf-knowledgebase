@@ -11,7 +11,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class JSONFormatter(logging.Formatter):
@@ -113,7 +113,7 @@ class ConsoleFormatter(logging.Formatter):
 
 def setup_logging(
     log_level: str = "INFO",
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     console_output: bool = True,
 ) -> logging.Logger:
     """
@@ -192,7 +192,7 @@ def log_structured(
 
 def format_error_message(
     datasheet_name: str,
-    file_path: Optional[Path],
+    file_path: Path | None,
     error_summary: str,
     error_reason: str,
     suggested_action: str,
@@ -227,11 +227,13 @@ def format_error_message(
     if file_path:
         lines.append(f"   File: {file_path}")
 
-    lines.extend([
-        f"   Error: {error_summary}",
-        f"   Reason: {error_reason}",
-        f"   Action: {suggested_action}",
-    ])
+    lines.extend(
+        [
+            f"   Error: {error_summary}",
+            f"   Reason: {error_reason}",
+            f"   Action: {suggested_action}",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -240,9 +242,9 @@ def log_datasheet_status(
     logger: logging.Logger,
     datasheet_name: str,
     status: str,
-    duration_seconds: Optional[float] = None,
-    chunks_created: Optional[int] = None,
-    error_message: Optional[str] = None,
+    duration_seconds: float | None = None,
+    chunks_created: int | None = None,
+    error_message: str | None = None,
 ) -> None:
     """
     Log datasheet ingestion status with structured metadata.
@@ -269,5 +271,7 @@ def log_datasheet_status(
     if error_message:
         metadata["error_message"] = error_message
 
-    level = "info" if status == "success" else "warning" if status == "skipped" else "error"
+    level = (
+        "info" if status == "success" else "warning" if status == "skipped" else "error"
+    )
     log_structured(logger, level, f"Datasheet {status}: {datasheet_name}", **metadata)

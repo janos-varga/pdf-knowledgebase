@@ -11,6 +11,9 @@ Exports:
 
 from enum import Enum
 
+from src.models.chunk import ContentChunk
+from src.models.datasheet import BatchIngestionReport, Datasheet, IngestionResult
+
 
 class IngestionStatus(Enum):
     """Status of datasheet ingestion process."""
@@ -25,10 +28,6 @@ class IngestionStatus(Enum):
         """Return the string value of the status."""
         return self.value
 
-
-# Import models
-from .chunk import ContentChunk
-from .datasheet import BatchIngestionReport, Datasheet, IngestionResult
 
 __all__ = [
     "IngestionStatus",

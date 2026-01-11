@@ -10,23 +10,22 @@ Coordinates:
 
 import logging
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
 
-from ..models import (
-    Datasheet,
-    ContentChunk,
-    IngestionResult,
-    IngestionStatus,
-    BatchIngestionReport,
-)
-from .markdown_parser import (
+from src.ingestion.chroma_client import ChromaDBClient
+from src.ingestion.chunker import create_chunker
+from src.ingestion.markdown_parser import (
     parse_markdown_file,
     resolve_all_image_paths,
 )
-from .chunker import create_chunker
-from .chroma_client import ChromaDBClient
+from src.models import (
+    BatchIngestionReport,
+    ContentChunk,
+    Datasheet,
+    IngestionResult,
+    IngestionStatus,
+)
 
 logger = logging.getLogger("datasheet_ingestion.pipeline")
 
@@ -35,7 +34,7 @@ logger = logging.getLogger("datasheet_ingestion.pipeline")
 PERFORMANCE_TARGET_SECONDS = 30.0
 
 
-def discover_datasheets(folder_path: Path) -> List[Datasheet]:
+def discover_datasheets(folder_path: Path) -> list[Datasheet]:
     """
     Discover datasheets in folder by scanning for subfolders with .md files.
 
@@ -73,7 +72,7 @@ def discover_datasheets(folder_path: Path) -> List[Datasheet]:
             # Try to create Datasheet from subfolder
             datasheet = Datasheet.from_folder(
                 subfolder,
-                ingestion_timestamp=datetime.utcnow(),
+                ingestion_timestamp=datetime.now(UTC),
             )
             datasheets.append(datasheet)
             logger.debug(f"Discovered datasheet: {datasheet.name}")
@@ -217,7 +216,7 @@ def ingest_datasheet(
 
 
 def ingest_batch(
-    datasheets: List[Datasheet],
+    datasheets: list[Datasheet],
     chroma_client: ChromaDBClient,
     force_update: bool = False,
 ) -> BatchIngestionReport:
@@ -237,7 +236,7 @@ def ingest_batch(
     Raises:
         RuntimeError: If ChromaDB connection fails (batch-level error)
     """
-    start_timestamp = datetime.utcnow()
+    start_timestamp = datetime.now(UTC)
     logger.info(f"Starting batch ingestion: {len(datasheets)} datasheets")
 
     # Validate ChromaDB connection
@@ -282,7 +281,7 @@ def ingest_batch(
             )
             results.append(result)
 
-    end_timestamp = datetime.utcnow()
+    end_timestamp = datetime.now(UTC)
 
     # Create batch report
     report = BatchIngestionReport(
