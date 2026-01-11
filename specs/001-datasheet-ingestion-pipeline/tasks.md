@@ -37,14 +37,14 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 [P] Implement structured logging configuration in src/utils/logger.py with console (human-readable) and file (JSON) handlers
-- [ ] T009 [P] Implement folder structure validators in src/utils/validators.py (validate_folder_path, validate_datasheet_folder)
-- [ ] T010 [P] Create IngestionStatus enum in src/models/__init__.py (PENDING, PROCESSING, SUCCESS, ERROR, SKIPPED)
-- [ ] T011 [P] Create Datasheet model in src/models/datasheet.py with validation, from_folder() factory method, and state management
-- [ ] T012 [P] Create ContentChunk model in src/models/chunk.py with metadata extraction (_contains_table, _contains_code_block, _extract_section_heading), validation, and to_chromadb_format() method
-- [ ] T013 [P] Create IngestionResult model in src/models/datasheet.py with success/error/skipped status tracking and performance metrics
-- [ ] T014 [P] Create BatchIngestionReport model in src/models/datasheet.py with aggregation properties and summary() method
-- [ ] T015 Create ChromaDB client wrapper in src/ingestion/chroma_client.py with collection initialization, metadata schema, and connection handling
+- [X] T008 [P] Implement structured logging configuration in src/utils/logger.py with console (human-readable) and file (JSON) handlers
+- [X] T009 [P] Implement folder structure validators in src/utils/validators.py (validate_folder_path, validate_datasheet_folder)
+- [X] T010 [P] Create IngestionStatus enum in src/models/__init__.py (PENDING, PROCESSING, SUCCESS, ERROR, SKIPPED)
+- [X] T011 [P] Create Datasheet model in src/models/datasheet.py with validation, from_folder() factory method, and state management
+- [X] T012 [P] Create ContentChunk model in src/models/chunk.py with metadata extraction (_contains_table, _contains_code_block, _extract_section_heading), validation, and to_chromadb_format() method
+- [X] T013 [P] Create IngestionResult model in src/models/datasheet.py with success/error/skipped status tracking and performance metrics
+- [X] T014 [P] Create BatchIngestionReport model in src/models/datasheet.py with aggregation properties and summary() method
+- [X] T015 Create ChromaDB client wrapper in src/ingestion/chroma_client.py with collection initialization, metadata schema, and connection handling
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

@@ -208,3 +208,7 @@ __marimo__/
 
 # Structured logging output
 .logs/
+
+# AI
+.specify/
+.github/

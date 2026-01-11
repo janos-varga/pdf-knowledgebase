@@ -19,7 +19,7 @@ An electrical engineer has a collection of component datasheets in markdown form
 
 1. **Given** a folder containing multiple datasheet subfolders with markdown files, **When** the user runs the CLI with the folder path, **Then** all datasheets are parsed, chunked semantically, and stored in ChromaDB with success confirmation
 2. **Given** a datasheet markdown file with embedded images, **When** the ingestion runs, **Then** image paths are converted to absolute paths and stored in metadata
-3. **Given** a datasheet with tables and formulae, **When** semantic chunking occurs, **Then** tables remain intact within chunks and are not split mid-table
+3. **Given** a datasheet with tables and formulae, **When** semantic chunking occurs, **Then** tables remain intact within chunks and are not split mid-table, even if the table crosses section boundaries
 4. **Given** a datasheet with multiple sections, **When** semantic chunking occurs, **Then** section boundaries are respected and content is logically grouped
 
 ---
@@ -61,7 +61,7 @@ The engineer encounters various data quality issues: corrupted markdown files, m
 
 - What happens when a datasheet folder contains multiple markdown files instead of just one?
 - How does the system handle very large markdown files (>10MB)?
-- What happens if two datasheet folders have the same name but different paths?
+- ~~What happens if two datasheet folders have the same name but different paths?~~ (Resolved: Folder name serves as unique identifier, so duplicate folder names are treated as the same datasheet regardless of path)
 - How does the system handle special characters in folder names or file paths?
 - What happens when ChromaDB storage is nearly full?
 - How does the system handle concurrent ingestion attempts?
@@ -76,37 +76,52 @@ The engineer encounters various data quality issues: corrupted markdown files, m
 - **FR-002**: System MUST identify datasheet subfolders where each subfolder contains one markdown file plus optional images
 - **FR-003**: System MUST parse markdown files including tables, formulae, and image references
 - **FR-004**: System MUST convert relative image paths to absolute paths before storing in metadata
-- **FR-005**: System MUST perform semantic chunking that respects section boundaries, table integrity, and logical content grouping
-- **FR-006**: System MUST store chunked content in persistent ChromaDB located at `D:\.cache\chromadb`
+- **FR-005**: System MUST perform semantic chunking that respects section boundaries, table integrity, and logical content grouping. When tables or code blocks span section boundaries, they MUST be kept intact within a single chunk even if this crosses section boundaries. Chunking MUST use a two-stage approach: first, ExperimentalMarkdownSyntaxTextSplitter with strip_headers=False to preserve markdown structure, then RecursiveCharacterTextSplitter within each markdown group with target chunk size of 1500 characters and 15% overlap (approximately 225 characters)
+- **FR-006**: System MUST store chunked content in persistent ChromaDB located at `D:\.cache\chromadb` using a single collection named "datasheets"
 - **FR-007**: System MUST use ChromaDB's default embedding function for vector embeddings
-- **FR-008**: System MUST check if a datasheet already exists in ChromaDB before ingestion
+- **FR-008**: System MUST check if a datasheet already exists in ChromaDB before ingestion using folder name as the unique identifier
 - **FR-009**: System MUST skip datasheets that already exist unless `--force-update` flag is provided
 - **FR-010**: System MUST remove and re-ingest existing datasheets when `--force-update` flag is used
-- **FR-011**: System MUST provide a CLI interface with required argument `datasheets_folder_path` and optional flag `--force-update`
+- **FR-011**: System MUST provide a CLI interface with required argument `datasheets_folder_path` and optional flags `--force-update` and `--log-level` (choices: DEBUG, INFO, WARNING, ERROR; default: INFO). The CLI MUST exit with status codes: 0 (success), 1 (validation error), 2 (ChromaDB error), 3 (ingestion error)
 - **FR-012**: System MUST log ingestion progress including success, skip, and error status for each datasheet
-- **FR-013**: System MUST store metadata for each chunk including source datasheet name, folder path, chunk index, and absolute image paths
+- **FR-013**: System MUST store metadata for each chunk including source datasheet name, folder path, chunk index, section heading, absolute image paths, ingestion timestamp, and structural flags (has_table, has_code_block)
 - **FR-014**: System MUST handle ingestion errors gracefully without terminating the entire batch process
 - **FR-015**: System MUST validate folder structure before beginning ingestion
+- **FR-016**: System MUST log a warning when datasheet ingestion exceeds the 30-second performance target and continue processing (for monitoring slow ingestions)
+- **FR-017**: System SHOULD store embedding model name/version and chunking strategy parameters in ChromaDB collection metadata for debugging and transparency per Constitution Principle II
 
 ### Key Entities
 
 - **Datasheet**: Represents a single electrical component's technical documentation, stored as one markdown file plus optional images within a dedicated subfolder. Key attributes include component name (derived from folder name), markdown content, image references, and metadata tags relevant to electrical engineering domain.
 
-- **Content Chunk**: Represents a semantically meaningful segment of a datasheet after intelligent chunking. Key attributes include original text content, vector embedding, parent datasheet reference, chunk sequence number, section heading, and whether it contains tables or formulae.
+- **ContentChunk**: Represents a semantically meaningful segment of a datasheet after intelligent chunking. Key attributes include original text content, vector embedding, parent datasheet reference, chunk sequence number, section heading, and whether it contains tables or formulae.
 
-- **Image Reference**: Represents a link between datasheet content and associated diagrams, schematics, or graphs. Key attributes include absolute file path, original relative path, image type (schematic, pin diagram, performance graph, etc.), and parent chunk reference.
+- **Image Reference**: Represents a link between datasheet content and associated diagrams, schematics, or graphs. This is a *logical concept* rather than a standalone class - image references are stored as metadata within ContentChunk entities. Key attributes include absolute file path, original relative path, image type (schematic, pin diagram, performance graph, etc.), and parent chunk reference.
 
-- **Ingestion Record**: Represents the status and history of datasheet processing. Key attributes include datasheet identifier, ingestion timestamp, success/failure status, number of chunks created, and any error messages encountered.
+- **IngestionResult**: Represents the status and history of datasheet processing. Key attributes include datasheet identifier (folder name), ingestion timestamp, success/failure status, number of chunks created, and any error messages encountered.
+
+- **BatchIngestionReport**: Represents aggregated results across a batch ingestion run. Key attributes include total datasheets processed, success count, skip count, error count, average ingestion time, and detailed error messages for failed datasheets.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: System successfully ingests 95% or more of well-formed datasheets in a typical batch without errors
-- **SC-002**: Ingestion of a 20-page datasheet completes within 30 seconds on standard hardware
+- **SC-002**: Ingestion of a 20-page datasheet typically completes within 30 seconds on standard hardware (performance target per FR-016; exceeding this triggers a warning but does not constitute failure)
 - **SC-003**: Semantic chunks maintain logical coherence with 90% or more of tables and code blocks remaining intact within single chunks
 - **SC-004**: Image path resolution succeeds for 100% of valid image references in ingested datasheets
 - **SC-005**: Duplicate detection correctly identifies existing datasheets with 100% accuracy to prevent unnecessary re-processing
 - **SC-006**: System processes a folder containing 100 datasheets (average 15 pages each) within 30 minutes
 - **SC-007**: Error messages clearly identify the specific datasheet and issue for 100% of failed ingestions
 - **SC-008**: Force-update operation completely replaces existing datasheet content with 100% consistency (no orphaned chunks)
+
+## Clarifications
+
+### Session 2025-01-22
+
+- Q: How does the system uniquely identify a datasheet for duplicate detection? → A: Use folder name as unique identifier
+- Q: What is the semantic chunking behavior for tables/code blocks at section boundaries? → A: Always keep tables/code blocks intact within a single chunk, even if it crosses section boundaries
+- Q: What should happen when ingestion exceeds the 30-second performance target? → A: Log a warning and continue processing (track slow ingestions for monitoring)
+- Q: What is the ChromaDB collection management strategy? → A: Use a single persistent collection named "datasheets" for all datasheets across all ingestion runs
+- Q: What is the target chunk size and chunking strategy? → A: Use dynamic semantic chunking with ExperimentalMarkdownSyntaxTextSplitter (strip_headers=False) for markdown structure, then apply RecursiveCharacterTextSplitter within each markdown group with chunk size of 1500 characters and 15% overlap (approximately 225 characters)
+- Q: What defines "standard hardware" for SC-002 performance baseline? → A: 4-core CPU (2.5GHz or higher), 8GB RAM minimum, SSD storage, Windows 10/11 operating system

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "Janos Varga", email = "nottellingya@yahoo.com"}
 ]
 keywords = ["datasheet", "ingestion", "chromadb", "langchain", "vector-database"]
 classifiers = [
@@ -31,8 +31,7 @@ dependencies = [
     "markdown>=3.5.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
-    # PyTorch CPU-only - install separately with:
-    # uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+    "torch>=2.9.0",
 ]
 
 [project.optional-dependencies]
