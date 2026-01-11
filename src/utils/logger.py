@@ -190,6 +190,52 @@ def log_structured(
     log_func(message, extra=kwargs)
 
 
+def format_error_message(
+    datasheet_name: str,
+    file_path: Optional[Path],
+    error_summary: str,
+    error_reason: str,
+    suggested_action: str,
+) -> str:
+    """
+    Format a structured error message with actionable guidance.
+
+    Args:
+        datasheet_name: Name of the datasheet that failed
+        file_path: Path to the file that caused the error
+        error_summary: Brief summary of the error
+        error_reason: Detailed reason for the error
+        suggested_action: Suggested action to resolve the error
+
+    Returns:
+        Formatted error message string
+
+    Examples:
+        >>> format_error_message(
+        ...     "TL072",
+        ...     Path("D:/datasheets/TL072/TL072.md"),
+        ...     "Markdown parsing failed",
+        ...     "File is empty or contains no valid content",
+        ...     "Add content to the markdown file and try again"
+        ... )
+        '❌ Datasheet: TL072\\n   File: D:/datasheets/TL072/TL072.md\\n   Error: Markdown parsing failed\\n   Reason: File is empty or contains no valid content\\n   Action: Add content to the markdown file and try again'
+    """
+    lines = [
+        f"❌ Datasheet: {datasheet_name}",
+    ]
+
+    if file_path:
+        lines.append(f"   File: {file_path}")
+
+    lines.extend([
+        f"   Error: {error_summary}",
+        f"   Reason: {error_reason}",
+        f"   Action: {suggested_action}",
+    ])
+
+    return "\n".join(lines)
+
+
 def log_datasheet_status(
     logger: logging.Logger,
     datasheet_name: str,
