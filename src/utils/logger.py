@@ -154,6 +154,11 @@ def setup_logging(
     file_handler.setFormatter(JSONFormatter())
     logger.addHandler(file_handler)
 
+    # Configure third-party loggers to reduce noise
+    # ChromaDB: Only show ERROR level
+    logging.getLogger("chromadb").setLevel(logging.ERROR)
+    logging.getLogger("chromadb.telemetry").setLevel(logging.ERROR)
+
     logger.info(f"Logging configured: level={log_level}, file={log_file}")
     return logger
 
@@ -218,10 +223,10 @@ def format_error_message(
         ...     "File is empty or contains no valid content",
         ...     "Add content to the markdown file and try again"
         ... )
-        '❌ Datasheet: TL072\\n   File: D:/datasheets/TL072/TL072.md\\n   Error: Markdown parsing failed\\n   Reason: File is empty or contains no valid content\\n   Action: Add content to the markdown file and try again'
+        '[X] Datasheet: TL072\\n   File: D:/datasheets/TL072/TL072.md\\n   Error: Markdown parsing failed\\n   Reason: File is empty or contains no valid content\\n   Action: Add content to the markdown file and try again'
     """
     lines = [
-        f"❌ Datasheet: {datasheet_name}",
+        f"[X] Datasheet: {datasheet_name}",
     ]
 
     if file_path:

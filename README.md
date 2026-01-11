@@ -20,7 +20,7 @@ This pipeline enables engineers to build a searchable knowledge base of componen
 
 ## Requirements
 
-- **Python**: 3.10 or higher
+- **Python**: 3.13+
 - **Platform**: Windows (primary), cross-platform compatible
 - **Dependencies**: Managed with `uv` package manager
 

@@ -6,9 +6,9 @@ Contains:
     - IngestionResult: Single datasheet ingestion result
     - BatchIngestionReport: Batch ingestion summary
 """
-
+import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.models.status import IngestionStatus
@@ -91,7 +91,7 @@ class Datasheet:
             ValueError: If multiple markdown files found
         """
         if ingestion_timestamp is None:
-            ingestion_timestamp = datetime.utcnow()
+            ingestion_timestamp = datetime.now(UTC)
 
         folder_path = folder_path.resolve()
         name = folder_path.name
@@ -269,13 +269,14 @@ class BatchIngestionReport:
             Formatted summary string
         """
         lines = [
+            os.linesep,
             "=" * 60,
             "Ingestion Batch Summary",
             "=" * 60,
             f"Total Datasheets: {self.total_datasheets}",
-            f"  ✅ Successful: {self.successful}",
-            f"  ⏭️  Skipped: {self.skipped}",
-            f"  ❌ Failed: {self.failed}",
+            f"  [OK] Successful: {self.successful}",
+            f"  [>>] Skipped: {self.skipped}",
+            f"  [X] Failed: {self.failed}",
             "",
             f"Total Chunks Created: {self.total_chunks}",
             f"Total Duration: {self.total_duration_seconds:.2f} seconds",
@@ -284,17 +285,17 @@ class BatchIngestionReport:
 
         slow = self.exceeded_performance_targets()
         if slow:
-            lines.append(f"\n⚠️  Slow Ingestions (>30s): {len(slow)}")
+            lines.append(f"[!] Slow Ingestions (>30s): {len(slow)}")
             for name in slow[:5]:  # Show first 5
                 lines.append(f"  - {name}")
             if len(slow) > 5:
                 lines.append(f"  ... and {len(slow) - 5} more")
 
         if self.failed > 0:
-            lines.append("\n❌ Failed Datasheets:")
+            lines.append("[X] Failed Datasheets:")
             for result in self.results:
                 if result.is_error():
                     lines.append(f"  - {result.datasheet_name}: {result.error_message}")
 
         lines.append("=" * 60)
-        return "\n".join(lines)
+        return os.linesep.join(lines)

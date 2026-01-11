@@ -52,9 +52,12 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Using main.py (recommended)
+  # Ingest multiple datasheets from a folder containing subfolders
   python main.py D:\\datasheets\\components
   uv run main.py D:\\datasheets\\components
+
+  # Ingest a single datasheet from its folder
+  python main.py D:\\datasheets\\components\\TL072
 
   # Using module directly
   python -m src.cli.ingest D:\\datasheets\\components
@@ -81,7 +84,7 @@ Exit Codes:
     parser.add_argument(
         "datasheets_folder_path",
         type=str,
-        help="Path to folder containing datasheet subfolders (each with one .md file)",
+        help="Path to folder containing datasheet subfolders or a single datasheet folder",
     )
 
     # Optional flags
@@ -161,7 +164,7 @@ def print_progress(current: int, total: int, datasheet_name: str, status: str) -
         datasheet_name: Name of datasheet being processed
         status: Status message (e.g., "Processing...", "Success", "Failed")
     """
-    print(f"[{current}/{total}] {datasheet_name}: {status}")
+    logger.info(f"[{current}/{total}] {datasheet_name}: {status}")
 
 
 def print_summary(report) -> None:
@@ -173,28 +176,7 @@ def print_summary(report) -> None:
     """
     # Print summary from report
     summary = report.summary()
-    print("\n" + summary)
-
-    # Additional details for failed datasheets
-    if report.failed > 0:
-        print("\n" + "=" * 70)
-        print("Failed Datasheets - Detailed Errors:")
-        print("=" * 70)
-        for result in report.results:
-            if result.is_error():
-                print(f"\n❌ {result.datasheet_name}")
-                print(f"   Error: {result.error_message}")
-                print(f"   Duration: {result.duration_seconds:.2f}s")
-
-    # Additional details for skipped datasheets
-    if report.skipped > 0:
-        print("\n" + "=" * 70)
-        print("Skipped Datasheets:")
-        print("=" * 70)
-        for result in report.results:
-            if result.is_skipped():
-                print(f"\n⏭️  {result.datasheet_name}")
-                print(f"   Reason: {result.skipped_reason}")
+    logger.info("" + summary)
 
 
 def main() -> int:
@@ -224,30 +206,30 @@ def main() -> int:
             validate_folder_path(folder_path)
         except (FileNotFoundError, ValueError) as e:
             logger.error(f"Validation error: {e}")
-            print(f"\n❌ Error: {e}")
-            print(
-                "\nPlease provide a valid folder path containing datasheet subfolders."
+            logger.error(f"[X] Error: {e}")
+            logger.error(
+                "Please provide a valid folder path containing datasheet subfolders."
             )
             return EXIT_VALIDATION_ERROR
 
         # Discover datasheets
-        print("\nDiscovering datasheets...")
+        logger.info("Discovering datasheets...")
         try:
             datasheets = discover_datasheets(folder_path)
         except (FileNotFoundError, ValueError) as e:
             logger.error(f"Discovery error: {e}")
-            print(f"\n❌ Error: {e}")
+            logger.error(f"[X] Error: {e}")
             return EXIT_VALIDATION_ERROR
 
         if not datasheets:
-            print("\n⚠️  No datasheets found in folder.")
-            print("   Each datasheet should be in its own subfolder with one .md file.")
+            logger.warning("[!] No datasheets found in folder.")
+            logger.warning("   Each datasheet should be in its own subfolder with one .md file.")
             return EXIT_VALIDATION_ERROR
 
-        print(f"Found {len(datasheets)} datasheets")
+        logger.info(f"Found {len(datasheets)} datasheets")
 
         # Initialize ChromaDB client
-        print("\nInitializing ChromaDB...")
+        logger.info("Initializing ChromaDB...")
         try:
             chroma_client = ChromaDBClient(
                 chromadb_path=chromadb_path,
@@ -255,24 +237,24 @@ def main() -> int:
             )
         except RuntimeError as e:
             logger.error(f"ChromaDB initialization error: {e}")
-            print(f"\n❌ ChromaDB Error: {e}")
-            print("\nPossible causes:")
-            print("  - ChromaDB path is not accessible")
-            print("  - Insufficient disk space")
-            print("  - Permission denied")
+            logger.error(f"[X] ChromaDB Error: {e}")
+            logger.error("Possible causes:")
+            logger.error("  - ChromaDB path is not accessible")
+            logger.error("  - Insufficient disk space")
+            logger.error("  - Permission denied")
             return EXIT_CHROMADB_ERROR
 
         # Validate ChromaDB connection
         is_valid, error_msg = chroma_client.validate_connection()
         if not is_valid:
             logger.error(f"ChromaDB validation error: {error_msg}")
-            print(f"\n❌ ChromaDB Validation Error: {error_msg}")
+            logger.error(f"[X] ChromaDB Validation Error: {error_msg}")
             return EXIT_CHROMADB_ERROR
 
-        print("ChromaDB initialized successfully")
+        logger.info("ChromaDB initialized successfully")
 
         # Run batch ingestion
-        print("\nStarting batch ingestion...\n")
+        logger.info("Starting batch ingestion...")
         try:
             report = ingest_batch(
                 datasheets,
@@ -281,7 +263,7 @@ def main() -> int:
             )
         except RuntimeError as e:
             logger.error(f"Batch ingestion error: {e}")
-            print(f"\n❌ Batch Ingestion Error: {e}")
+            logger.error(f"[X] Batch Ingestion Error: {e}")
             return EXIT_INGESTION_ERROR
 
         # Print summary
@@ -299,14 +281,13 @@ def main() -> int:
             return EXIT_INGESTION_ERROR
 
     except KeyboardInterrupt:
-        print("\n\n⚠️  Interrupted by user")
+        logger.warning("[!] Interrupted by user")
         logger.warning("CLI interrupted by user")
         return EXIT_INGESTION_ERROR
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        print(f"\n❌ Unexpected Error: {e}")
-        print("\nPlease check logs for details.")
+        logger.error(f"[X] Unexpected Error: {e}")
         return EXIT_INGESTION_ERROR
 
 

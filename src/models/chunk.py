@@ -117,7 +117,9 @@ class ContentChunk:
             metadata["section_heading"] = self.section_heading
 
         if self.image_paths:
-            metadata["image_paths"] = self.image_paths
+            # ChromaDB only supports str, int, float, bool metadata
+            # Convert list to comma-separated string
+            metadata["image_paths"] = ",".join(self.image_paths)
 
         if self.source_page_hint:
             metadata["source_page_hint"] = self.source_page_hint

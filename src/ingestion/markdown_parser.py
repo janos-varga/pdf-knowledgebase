@@ -68,7 +68,6 @@ def parse_markdown_file(markdown_path: Path) -> str:
 def resolve_image_path(
     image_ref: str,
     markdown_path: Path,
-    folder_path: Path,
 ) -> Path | None:
     """
     Resolve relative image path to absolute Windows path.
@@ -82,15 +81,13 @@ def resolve_image_path(
     Args:
         image_ref: Image reference from markdown (relative or absolute)
         markdown_path: Absolute path to markdown file
-        folder_path: Absolute path to datasheet folder
 
     Returns:
         Absolute path to image file, or None if resolution fails
 
     Examples:
         >>> resolve_image_path("pinout.png",
-        ...     Path("D:/datasheets/TL072/TL072.md"),
-        ...     Path("D:/datasheets/TL072"))
+        ...     Path("D:/datasheets/TL072/TL072.md"))
         WindowsPath('D:/datasheets/TL072/pinout.png')
     """
     # Handle empty references
@@ -115,28 +112,16 @@ def resolve_image_path(
 
     # Resolve relative path from markdown file location
     try:
-        # Try resolving relative to markdown file's directory
-        markdown_dir = markdown_path.parent
-        resolved_path = (markdown_dir / image_path).resolve()
+        # Resolve relative to markdown file's directory
+        folder_path = markdown_path.parent
+        resolved_path = (folder_path / image_path).resolve()
 
         if resolved_path.exists():
             logger.debug(f"Resolved image path relative to markdown: {resolved_path}")
             return resolved_path
 
-        # Try resolving relative to datasheet folder root
-        resolved_path = (folder_path / image_path).resolve()
-
-        if resolved_path.exists():
-            logger.debug(
-                f"Resolved image path relative to folder root: {resolved_path}"
-            )
-            return resolved_path
-
         # Image path doesn't exist
-        logger.warning(
-            f"Image path '{image_ref}' does not exist "
-            f"(tried relative to markdown and folder root)"
-        )
+        logger.warning(f"Image path '{image_ref}' does not exist")
         return None
 
     except (OSError, ValueError) as e:
@@ -179,7 +164,6 @@ def extract_image_references(content: str) -> list[str]:
 def resolve_all_image_paths(
     content: str,
     markdown_path: Path,
-    folder_path: Path,
 ) -> tuple[str, list[Path]]:
     """
     Resolve all image paths in markdown content to absolute paths.
@@ -189,7 +173,6 @@ def resolve_all_image_paths(
     Args:
         content: Markdown content with relative image paths
         markdown_path: Absolute path to markdown file
-        folder_path: Absolute path to datasheet folder
 
     Returns:
         Tuple of (updated_content, resolved_image_paths)
@@ -200,8 +183,7 @@ def resolve_all_image_paths(
         >>> content = "![pin](pin.png)"
         >>> new_content, paths = resolve_all_image_paths(
         ...     content,
-        ...     Path("D:/ds/TL072/TL072.md"),
-        ...     Path("D:/ds/TL072")
+        ...     Path("D:/ds/TL072/TL072.md")
         ... )
         >>> # new_content: "![pin](D:/ds/TL072/pin.png)"
         >>> # paths: [WindowsPath('D:/ds/TL072/pin.png')]
@@ -218,7 +200,7 @@ def resolve_all_image_paths(
 
     # Resolve each image reference
     for image_ref in image_refs:
-        resolved_path = resolve_image_path(image_ref, markdown_path, folder_path)
+        resolved_path = resolve_image_path(image_ref, markdown_path)
 
         if resolved_path:
             resolved_paths.append(resolved_path)
@@ -226,7 +208,8 @@ def resolve_all_image_paths(
             # Replace relative path with absolute path in content
             # Use regex to ensure we only replace within image syntax
             pattern = rf"(!\[[^\]]*\]\(){re.escape(image_ref)}(\))"
-            replacement = rf"\1{resolved_path}\2"
+            # Convert Path to string and escape backslashes for regex replacement
+            replacement = rf"\1{str(resolved_path).replace(chr(92), chr(92)*2)}\2"
             updated_content = re.sub(pattern, replacement, updated_content)
 
             logger.debug(f"Replaced '{image_ref}' with '{resolved_path}'")

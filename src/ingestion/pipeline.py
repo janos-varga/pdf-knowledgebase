@@ -38,16 +38,26 @@ def discover_datasheets(folder_path: Path) -> list[Datasheet]:
     """
     Discover datasheets in folder by scanning for subfolders with .md files.
 
-    Expected structure:
-        folder_path/
-            ├── Datasheet1/
-            │   └── Datasheet1.md
-            ├── Datasheet2/
-            │   └── Datasheet2.md
-            └── ...
+    Supports two modes:
+    1. Multiple datasheets: folder_path contains subfolders, each with one .md file
+    2. Single datasheet: folder_path itself contains one .md file
+
+    Expected structures:
+        Multiple datasheets:
+            folder_path/
+                ├── Datasheet1/
+                │   └── Datasheet1.md
+                ├── Datasheet2/
+                │   └── Datasheet2.md
+                └── ...
+
+        Single datasheet:
+            folder_path/
+                ├── Datasheet.md
+                └── images/...
 
     Args:
-        folder_path: Path to folder containing datasheet subfolders
+        folder_path: Path to folder containing datasheet(s)
 
     Returns:
         List of discovered Datasheet instances
@@ -64,6 +74,22 @@ def discover_datasheets(folder_path: Path) -> list[Datasheet]:
 
     logger.info(f"Discovering datasheets in: {folder_path}")
 
+    # Check if this is a single datasheet folder (has .md file directly)
+    md_files = list(folder_path.glob("*.md"))
+    if md_files:
+        logger.info(f"Detected single datasheet folder with {len(md_files)} .md file(s)")
+        try:
+            datasheet = Datasheet.from_folder(
+                folder_path,
+                ingestion_timestamp=datetime.now(UTC),
+            )
+            logger.info(f"Discovered single datasheet: {datasheet.name}")
+            return [datasheet]
+        except (FileNotFoundError, ValueError) as e:
+            logger.error(f"Failed to create datasheet from folder: {e}")
+            return []
+
+    # Otherwise, scan subfolders for datasheets
     datasheets = []
     subfolders = [p for p in folder_path.iterdir() if p.is_dir()]
 
@@ -121,6 +147,9 @@ def ingest_datasheet(
             logger.info(f"Datasheet already exists, skipping: {datasheet.name}")
             duration = time.time() - start_time
 
+            # Print separator after skipped datasheet
+            logger.info("-" * 70)
+
             return IngestionResult(
                 datasheet_name=datasheet.name,
                 status=IngestionStatus.SKIPPED,
@@ -143,7 +172,6 @@ def ingest_datasheet(
         content, resolved_images = resolve_all_image_paths(
             content,
             datasheet.markdown_file_path,
-            datasheet.folder_path,
         )
 
         # Step 3: Chunk content
@@ -180,14 +208,17 @@ def ingest_datasheet(
         # Log performance
         if duration > PERFORMANCE_TARGET_SECONDS:
             logger.warning(
-                f"⚠️  Ingestion exceeded {PERFORMANCE_TARGET_SECONDS}s target: "
+                f"[!] Ingestion exceeded {PERFORMANCE_TARGET_SECONDS}s target: "
                 f"{datasheet.name} took {duration:.2f}s"
             )
         else:
             logger.info(
-                f"✅ Ingestion complete: {datasheet.name} "
+                f"[OK] Ingestion complete: {datasheet.name} "
                 f"({inserted_count} chunks, {duration:.2f}s)"
             )
+
+        # Print separator after datasheet completion
+        logger.info("-" * 70)
 
         return IngestionResult(
             datasheet_name=datasheet.name,
@@ -203,9 +234,12 @@ def ingest_datasheet(
         datasheet.duration_seconds = duration
 
         logger.error(
-            f"❌ Ingestion failed: {datasheet.name} - {e}",
+            f"[X] Ingestion failed: {datasheet.name} - {e}",
             exc_info=True,
         )
+
+        # Print separator after datasheet failure
+        logger.info("-" * 70)
 
         return IngestionResult(
             datasheet_name=datasheet.name,
@@ -257,18 +291,18 @@ def ingest_batch(
             # Log progress
             if result.is_success():
                 logger.info(
-                    f"  ✅ Success: {result.chunks_created} chunks, "
+                    f"  [OK] Success: {result.chunks_created} chunks, "
                     f"{result.duration_seconds:.2f}s"
                 )
             elif result.is_skipped():
-                logger.info(f"  ⏭️  Skipped: {result.skipped_reason}")
+                logger.info(f"  [>>] Skipped: {result.skipped_reason}")
             elif result.is_error():
-                logger.error(f"  ❌ Failed: {result.error_message}")
+                logger.error(f"  [X] Failed: {result.error_message}")
 
         except Exception as e:
             # Catch unexpected exceptions at batch level
             logger.error(
-                f"  ❌ Unexpected error processing {datasheet.name}: {e}",
+                f"  [X] Unexpected error processing {datasheet.name}: {e}",
                 exc_info=True,
             )
 
@@ -292,9 +326,9 @@ def ingest_batch(
 
     logger.info("Batch ingestion complete")
     logger.info(f"  Total: {report.total_datasheets}")
-    logger.info(f"  ✅ Successful: {report.successful}")
-    logger.info(f"  ⏭️  Skipped: {report.skipped}")
-    logger.info(f"  ❌ Failed: {report.failed}")
+    logger.info(f"  [OK] Successful: {report.successful}")
+    logger.info(f"  [>>] Skipped: {report.skipped}")
+    logger.info(f"  [X] Failed: {report.failed}")
     logger.info(f"  Duration: {report.total_duration_seconds:.2f}s")
 
     return report
@@ -324,7 +358,7 @@ def track_performance(result: IngestionResult) -> None:
     # Warn if exceeded target
     if duration > PERFORMANCE_TARGET_SECONDS:
         logger.warning(
-            f"⚠️  Performance target exceeded: "
+            f"[!] Performance target exceeded: "
             f"{duration:.2f}s > {PERFORMANCE_TARGET_SECONDS}s target "
             f"for {result.datasheet_name}"
         )
