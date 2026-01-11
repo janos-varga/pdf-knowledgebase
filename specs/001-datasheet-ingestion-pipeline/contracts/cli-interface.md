@@ -58,12 +58,10 @@ D:\projects\pcb\components
 datasheets_folder_path/
 ├── TL072/
 │   ├── TL072.md
-│   └── images/
-│       └── pinout.png
+│   └── pinout.png
 ├── LM358/
 │   ├── LM358.md
-│   └── images/
-│       └── schematic.png
+│   └── schematic.png
 └── ATmega328P/
     └── ATmega328P.md
 ```
@@ -166,7 +164,7 @@ INFO [TL072]: Created 12 chunks (duration: 4.2s)
 INFO [TL072]: ✅ Success
 
 # WARNING level
-WARNING [LM358]: Image not found: D:\datasheets\LM358\images\missing.png
+WARNING [LM358]: Image not found: D:\datasheets\LM358\missing.png
 WARNING [ATmega328P]: Ingestion exceeded 30-second target (actual: 35.2s)
 
 # ERROR level
@@ -325,7 +323,7 @@ Success Rate: 100.0%
 {"timestamp":"2025-01-22T10:30:02Z","level":"DEBUG","datasheet":"TL072","message":"Parsing markdown content","file_size_bytes":3245}
 {"timestamp":"2025-01-22T10:30:03Z","level":"DEBUG","datasheet":"TL072","message":"Semantic chunking complete","chunk_count":12}
 {"timestamp":"2025-01-22T10:30:04Z","level":"INFO","datasheet":"TL072","message":"Ingestion successful","chunk_count":12,"duration_ms":4200}
-{"timestamp":"2025-01-22T10:30:05Z","level":"WARNING","datasheet":"LM358","message":"Image not found","expected_path":"D:\\datasheets\\LM358\\images\\missing.png"}
+{"timestamp":"2025-01-22T10:30:05Z","level":"WARNING","datasheet":"LM358","message":"Image not found","expected_path":"D:\\datasheets\\LM358\\missing.png"}
 {"timestamp":"2025-01-22T10:30:06Z","level":"ERROR","datasheet":"NE555","message":"Failed to parse markdown","error":"UnicodeDecodeError: invalid continuation byte"}
 ```
 
@@ -547,7 +545,7 @@ WARNING [<datasheet_name>]: <warning_summary>
 
 ```
 WARNING [LM358]: Image not found
-  Expected: D:\datasheets\LM358\images\pinout.png
+  Expected: D:\datasheets\LM358\pinout.png
   Referenced in: D:\datasheets\LM358\LM358.md:23
   Impact: Image path not included in chunk metadata
 

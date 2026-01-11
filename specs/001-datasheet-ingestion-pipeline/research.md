@@ -139,8 +139,8 @@ def resolve_image_path(markdown_file_path: Path, relative_image_path: str) -> st
 # Example usage
 datasheet_folder = Path(r"D:\datasheets\TL072")
 markdown_file = datasheet_folder / "TL072.md"
-absolute_image = resolve_image_path(markdown_file, "./images/pinout.png")
-# Result: "D:\datasheets\TL072\images\pinout.png"
+absolute_image = resolve_image_path(markdown_file, "./pinout.png")
+# Result: "D:\datasheets\TL072\pinout.png"
 ```
 
 ### Edge Cases Handled
@@ -197,7 +197,7 @@ chunk_metadata = {
     "chunk_index": 0,  # Sequential chunk number
     "section_heading": "Electrical Characteristics",  # Section context
     "has_table": True,  # Flag for table-containing chunks
-    "image_paths": ["D:\\datasheets\\TL072\\images\\pinout.png"],  # List of absolute paths
+    "image_paths": ["D:\\datasheets\\TL072\\pinout.png"],  # List of absolute paths
     "ingestion_timestamp": "2025-01-22T10:30:00Z"  # ISO 8601 format
 }
 ```
@@ -282,7 +282,7 @@ ERROR [TL072]: Failed to parse markdown file
   Action: Check markdown syntax or skip this datasheet
 
 WARNING [LM358]: Image not found
-  Expected: D:\datasheets\LM358\images\pinout.png
+  Expected: D:\datasheets\LM358\pinout.png
   Referenced in: D:\datasheets\LM358\LM358.md:23
   Action: Continuing ingestion without image metadata
 ```

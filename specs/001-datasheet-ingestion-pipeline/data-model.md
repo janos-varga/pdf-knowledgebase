@@ -89,9 +89,8 @@ class Datasheet:
         datasheets/
           └── TL072/
               ├── TL072.md
-              └── images/
-                  ├── pinout.png
-                  └── schematic.png
+              ├── pinout.png
+              └── schematic.png
         """
         if ingestion_timestamp is None:
             ingestion_timestamp = datetime.utcnow()
@@ -576,7 +575,7 @@ metadatas = [
         "section_heading": "Electrical Characteristics",
         "has_table": True,
         "has_code_block": False,
-        "image_paths": ["D:\\datasheets\\TL072\\images\\pinout.png"],
+        "image_paths": ["D:\\datasheets\\TL072\\pinout.png"],
         "ingestion_timestamp": "2025-01-22T10:30:00Z"
     },
     ...

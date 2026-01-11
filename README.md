@@ -74,13 +74,11 @@ Datasheets must follow this structure:
 datasheets/
 ├── TL072/
 │   ├── TL072.md          # Exactly one .md file per folder
-│   └── images/
-│       ├── pinout.png
-│       └── schematic.png
+│   ├── pinout.png
+│   └── schematic.png
 ├── LM358/
 │   ├── LM358.md
-│   └── images/
-│       └── diagram.png
+│   └── diagram.png
 └── ...
 ```
 
@@ -155,7 +153,7 @@ Structured JSON logs are saved to `.logs/ingestion_{timestamp}.json`:
 
 ```
 Folder Path → Discovery → Duplicate Check → Parse Markdown
-    → Resolve Images → Semantic Chunking → Generate Embeddings
+    → Resolve Image Paths → Semantic Chunking → Generate Embeddings
     → Store in ChromaDB → Report Results
 ```
 

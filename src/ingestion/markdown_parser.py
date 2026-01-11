@@ -74,9 +74,9 @@ def resolve_image_path(
     Resolve relative image path to absolute Windows path.
 
     Handles common markdown image reference formats:
-        - ![alt](images/photo.png)
-        - ![alt](./images/photo.png)
-        - ![alt](../images/photo.png)
+        - ![alt](photo.png)
+        - ![alt](./photo.png)
+        - ![alt](../photo.png)
         - ![alt](/absolute/path/photo.png)
 
     Args:
@@ -88,10 +88,10 @@ def resolve_image_path(
         Absolute path to image file, or None if resolution fails
 
     Examples:
-        >>> resolve_image_path("images/pinout.png",
+        >>> resolve_image_path("pinout.png",
         ...     Path("D:/datasheets/TL072/TL072.md"),
         ...     Path("D:/datasheets/TL072"))
-        WindowsPath('D:/datasheets/TL072/images/pinout.png')
+        WindowsPath('D:/datasheets/TL072/pinout.png')
     """
     # Handle empty references
     if not image_ref:
@@ -197,14 +197,14 @@ def resolve_all_image_paths(
             - resolved_image_paths: List of successfully resolved absolute paths
 
     Examples:
-        >>> content = "![pin](images/pin.png)"
+        >>> content = "![pin](pin.png)"
         >>> new_content, paths = resolve_all_image_paths(
         ...     content,
         ...     Path("D:/ds/TL072/TL072.md"),
         ...     Path("D:/ds/TL072")
         ... )
-        >>> # new_content: "![pin](D:/ds/TL072/images/pin.png)"
-        >>> # paths: [WindowsPath('D:/ds/TL072/images/pin.png')]
+        >>> # new_content: "![pin](D:/ds/TL072/pin.png)"
+        >>> # paths: [WindowsPath('D:/ds/TL072/pin.png')]
     """
     # Extract image references
     image_refs = extract_image_references(content)

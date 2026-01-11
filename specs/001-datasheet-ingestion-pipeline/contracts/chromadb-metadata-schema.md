@@ -94,7 +94,7 @@ Each chunk stored in ChromaDB has associated metadata following this schema:
 | Field | Type | Description | Example | Constraints |
 |-------|------|-------------|---------|-------------|
 | `section_heading` | `str` | Markdown section heading | `"Electrical Characteristics"` | ≤ 100 characters |
-| `image_paths` | `list[str]` | Absolute paths to images in chunk | `["D:\\datasheets\\TL072\\images\\pinout.png"]` | Valid file paths |
+| `image_paths` | `list[str]` | Absolute paths to images in chunk | `["D:\\datasheets\\TL072\\pinout.png"]` | Valid file paths |
 | `source_page_hint` | `int` | Approximate source page number | `5` | ≥ 1 (future) |
 | `component_type` | `str` | Component category | `"op-amp"` | Future enhancement |
 | `contains_formula` | `bool` | Flag for mathematical formulae | `true` | Future enhancement |
@@ -163,8 +163,8 @@ metadata = {
     "has_code_block": False,
     "section_heading": "Pin Configuration",
     "image_paths": [
-        "D:\\datasheets\\TL072\\images\\pinout.png",
-        "D:\\datasheets\\TL072\\images\\package.png"
+        "D:\\datasheets\\TL072\\pinout.png",
+        "D:\\datasheets\\TL072\\package.png"
     ]
 }
 
@@ -173,9 +173,9 @@ document = """
 
 The TL072 is available in 8-pin DIP and SOIC packages.
 
-![Pinout Diagram](./images/pinout.png)
+![Pinout Diagram](./pinout.png)
 
-![Package Dimensions](./images/package.png)
+![Package Dimensions](./package.png)
 
 | Pin | Name | Function |
 |-----|------|----------|

@@ -76,9 +76,8 @@ class Datasheet:
             datasheets/
               └── TL072/
                   ├── TL072.md
-                  └── images/
-                      ├── pinout.png
-                      └── schematic.png
+                  ├── pinout.png
+                  └── schematic.png
 
         Args:
             folder_path: Path to datasheet folder

@@ -73,15 +73,13 @@ Create a folder structure with your datasheets:
 D:\datasheets\
 ├── TL072\
 │   ├── TL072.md          # Required: One markdown file
-│   └── images\
-│       └── pinout.png    # Optional: Images
+│   └── pinout.png    # Optional: Images
 ├── LM358\
 │   └── LM358.md
 └── NE555\
     ├── NE555.md
-    └── images\
-        ├── schematic.png
-        └── timing_diagram.png
+    ├── schematic.png
+    └── timing_diagram.png
 ```
 
 **Important**: Each datasheet must be in its own subfolder with exactly one `.md` file.
@@ -368,8 +366,7 @@ INFO: Collection: datasheets
 # Folder structure
 D:\projects\pcb\opamps\TL072\
 ├── TL072.md
-└── images\
-    └── pinout.png
+└── pinout.png
 
 # Ingest single datasheet
 uv run python -m src.cli.ingest D:\projects\pcb\opamps\TL072
@@ -523,8 +520,8 @@ python validate-structure.py && python -m src.cli.ingest D:\datasheets
 
 4. **Images** (Use relative paths):
    ```markdown
-   ![Pinout Diagram](./images/pinout.png)
-   ![Schematic](./images/schematic.png)
+   ![Pinout Diagram](./pinout.png)
+   ![Schematic](./schematic.png)
    ```
    
    **Note**: Relative paths are automatically converted to absolute paths during ingestion.
