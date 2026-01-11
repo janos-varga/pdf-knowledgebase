@@ -16,6 +16,7 @@ from pathlib import Path
 from src.ingestion.chroma_client import ChromaDBClient
 from src.ingestion.chunker import create_chunker
 from src.ingestion.markdown_parser import (
+    extract_image_references,
     parse_markdown_file,
     resolve_all_image_paths,
 )
@@ -32,6 +33,50 @@ logger = logging.getLogger("datasheet_ingestion.pipeline")
 
 # Performance target: 30 seconds per datasheet
 PERFORMANCE_TARGET_SECONDS = 30.0
+
+
+def _filter_chunk_image_paths(
+    chunk_text: str,
+    all_resolved_images: list[Path],
+) -> list[str]:
+    """
+    Filter resolved image paths to only those referenced in chunk text.
+
+    Args:
+        chunk_text: Text content of the chunk
+        all_resolved_images: All resolved image paths for the datasheet
+
+    Returns:
+        List of absolute path strings for images referenced in this chunk
+    """
+    # Extract image references from chunk text
+    image_refs = extract_image_references(chunk_text)
+
+    if not image_refs:
+        return []
+
+    # Create mapping of image filename to resolved path
+    # (handles both relative refs like "image.png" and absolute paths)
+    filename_to_path = {path.name: path for path in all_resolved_images}
+
+    # Also map full resolved path strings for absolute references
+    pathstr_to_path = {str(path): path for path in all_resolved_images}
+
+    chunk_images = []
+    for ref in image_refs:
+        # Try to match by filename first (most common case for relative refs)
+        ref_path = Path(ref)
+        if ref_path.name in filename_to_path:
+            resolved = filename_to_path[ref_path.name]
+            if str(resolved) not in chunk_images:
+                chunk_images.append(str(resolved))
+        # Try to match by full path for absolute references
+        elif ref in pathstr_to_path:
+            resolved = pathstr_to_path[ref]
+            if str(resolved) not in chunk_images:
+                chunk_images.append(str(resolved))
+
+    return chunk_images
 
 
 def discover_datasheets(folder_path: Path) -> list[Datasheet]:
@@ -183,13 +228,16 @@ def ingest_datasheet(
         logger.debug(f"Creating {len(text_chunks)} ContentChunk instances")
         chunks = []
         for idx, text in enumerate(text_chunks):
+            # Filter image paths to only those referenced in this chunk
+            chunk_image_paths = _filter_chunk_image_paths(text, resolved_images)
+
             chunk = ContentChunk(
                 text=text,
                 datasheet_name=datasheet.name,
                 folder_path=str(datasheet.folder_path),
                 chunk_index=idx,
                 ingestion_timestamp=datasheet.ingestion_timestamp.isoformat() + "Z",
-                image_paths=[str(p) for p in resolved_images],
+                image_paths=chunk_image_paths,
             )
             chunks.append(chunk)
 

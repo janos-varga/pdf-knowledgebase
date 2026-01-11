@@ -20,7 +20,7 @@ logger = logging.getLogger("datasheet_ingestion.chunker")
 
 # Configuration constants
 CHUNK_SIZE_TARGET = 1500  # Target chunk size in characters
-CHUNK_SIZE_MAX = 2000  # Maximum chunk size (hard limit for embeddings)
+CHUNK_SIZE_MAX = 4000  # Maximum chunk size (hard limit for embeddings)
 CHUNK_OVERLAP = 225  # 15% of target size
 CHUNK_OVERLAP_PERCENT = 15
 
@@ -239,17 +239,18 @@ class SemanticChunker:
 
         Returns:
             List of chunks, or empty list if splitting not possible
-        """
-        # This is a complex operation that requires careful parsing
-        # For MVP, we'll use simple recursive splitting as fallback
-        # TODO: Implement sophisticated table/code block boundary detection
 
-        try:
-            chunks = self.char_splitter.split_text(group)
-            return chunks
-        except Exception as e:
-            logger.debug(f"Could not split outside protected areas: {e}")
-            return []
+        Note:
+            Currently returns empty list to force fallback to keeping tables intact.
+            The RecursiveCharacterTextSplitter cannot safely split tables without
+            separating table captions from table data, which breaks semantic queries.
+        """
+        # TODO: Implement sophisticated table/code block boundary detection
+        # For now, return empty list to keep tables intact as single chunks
+        logger.debug(
+            "Skipping split of protected content to preserve table integrity"
+        )
+        return []
 
     def _contains_table(self, text: str) -> bool:
         """

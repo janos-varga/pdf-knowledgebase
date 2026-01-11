@@ -43,8 +43,8 @@ class ContentChunk:
         if not self.text or len(self.text.strip()) == 0:
             raise ValueError("Chunk text cannot be empty")
 
-        if len(self.text) > 2000:
-            raise ValueError(f"Chunk exceeds maximum length: {len(self.text)} > 2000")
+        # Note: Removed hard chunk size limit. Embedding model will truncate if needed.
+        # Tables should remain intact even if they exceed embedding model limits.
 
         if self.chunk_index < 0:
             raise ValueError("Chunk index must be non-negative")
