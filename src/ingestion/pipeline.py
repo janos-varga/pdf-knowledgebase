@@ -122,7 +122,9 @@ def discover_datasheets(folder_path: Path) -> list[Datasheet]:
     # Check if this is a single datasheet folder (has .md file directly)
     md_files = list(folder_path.glob("*.md"))
     if md_files:
-        logger.info(f"Detected single datasheet folder with {len(md_files)} .md file(s)")
+        logger.info(
+            f"Detected single datasheet folder with {len(md_files)} .md file(s)"
+        )
         try:
             datasheet = Datasheet.from_folder(
                 folder_path,

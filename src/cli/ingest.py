@@ -223,7 +223,9 @@ def main() -> int:
 
         if not datasheets:
             logger.warning("[!] No datasheets found in folder.")
-            logger.warning("   Each datasheet should be in its own subfolder with one .md file.")
+            logger.warning(
+                "   Each datasheet should be in its own subfolder with one .md file."
+            )
             return EXIT_VALIDATION_ERROR
 
         logger.info(f"Found {len(datasheets)} datasheets")
