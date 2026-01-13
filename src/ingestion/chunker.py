@@ -10,6 +10,7 @@ Ensures tables and code blocks remain intact within single chunks.
 
 import logging
 
+import tiktoken
 from langchain_text_splitters import (
     ExperimentalMarkdownSyntaxTextSplitter,
     RecursiveCharacterTextSplitter,
@@ -17,12 +18,11 @@ from langchain_text_splitters import (
 
 logger = logging.getLogger("datasheet_ingestion.chunker")
 
-
 # Configuration constants
-CHUNK_SIZE_TARGET = 1500  # Target chunk size in characters
-CHUNK_SIZE_MAX = 4000  # Maximum chunk size (hard limit for embeddings)
-CHUNK_OVERLAP = 225  # 15% of target size
-CHUNK_OVERLAP_PERCENT = 15
+CHUNK_SIZE_TARGET = 4000  # Target chunk size in characters
+CHUNK_SIZE_MAX = 8000  # Maximum chunk size (hard limit for embeddings)
+CHUNK_OVERLAP = 600  # 15% of target size
+CHUNK_OVERLAP_PERCENT = 15  # Overlap percentage for context
 
 
 class SemanticChunker:
@@ -57,7 +57,9 @@ class SemanticChunker:
         )
 
         # Stage 2: Recursive character splitter
-        self.char_splitter = RecursiveCharacterTextSplitter(
+        enc_name = tiktoken.encoding_name_for_model("text-embedding-3-small")
+        self.char_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            encoding_name=enc_name,
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
             separators=[
@@ -67,8 +69,9 @@ class SemanticChunker:
                 " ",
                 "",
             ],  # Prefer paragraph/sentence breaks
-            length_function=len,
         )
+        # We should count lengths in tokens, not characters
+        self.len_fn = self.char_splitter._length_function
 
         logger.info(
             f"SemanticChunker initialized: "
@@ -94,7 +97,10 @@ class SemanticChunker:
         if not content or not content.strip():
             raise ValueError("Cannot chunk empty content")
 
-        logger.debug(f"Starting two-stage chunking for content ({len(content)} chars)")
+        logger.debug(
+            f"Starting two-stage chunking for content ({len(content)} chars), "
+            f"{self.len_fn} tokens"
+        )
 
         # Stage 1: Markdown structure preservation
         markdown_groups = self._stage1_markdown_split(content)
@@ -107,7 +113,8 @@ class SemanticChunker:
 
         logger.info(
             f"Chunking complete: {len(final_chunks)} chunks created "
-            f"(avg {sum(len(c) for c in final_chunks) // len(final_chunks)} chars)"
+            f"(avg {sum(len(c) for c in final_chunks) // len(final_chunks)} chars), "
+            f"(avg {sum(self.len_fn(c) for c in final_chunks) // len(final_chunks)} tokens)."
         )
 
         return final_chunks
@@ -195,7 +202,7 @@ class SemanticChunker:
         Returns:
             List of chunks (usually 1 chunk to preserve structure)
         """
-        group_size = len(group)
+        group_size = self.len_fn(group)
 
         # If group fits within max size, keep it intact
         if group_size <= self.max_chunk_size:
@@ -247,9 +254,7 @@ class SemanticChunker:
         """
         # TODO: Implement sophisticated table/code block boundary detection
         # For now, return empty list to keep tables intact as single chunks
-        logger.debug(
-            "Skipping split of protected content to preserve table integrity"
-        )
+        logger.debug("Skipping split of protected content to preserve table integrity")
         return []
 
     def _contains_table(self, text: str) -> bool:
@@ -306,7 +311,9 @@ class SemanticChunker:
 
         # Check for oversized chunks
         oversized = [
-            (i, len(c)) for i, c in enumerate(chunks) if len(c) > self.chunk_size
+            (i, self.len_fn(c))
+            for i, c in enumerate(chunks)
+            if self.len_fn(c) > self.chunk_size
         ]
 
         if oversized:
@@ -317,7 +324,7 @@ class SemanticChunker:
             if warnings:
                 logger.warning(
                     f"Found {len(warnings)} chunks exceeding target size "
-                    f"({self.chunk_size} chars) but within max ({self.max_chunk_size}): "
+                    f"({self.chunk_size} tokens) but within max ({self.max_chunk_size}): "
                     f"{warnings[:3]}{'...' if len(warnings) > 3 else ''}"
                 )
 
@@ -326,15 +333,15 @@ class SemanticChunker:
             if errors:
                 logger.error(
                     f"Found {len(errors)} chunks exceeding maximum size "
-                    f"({self.max_chunk_size} chars): "
+                    f"({self.max_chunk_size} tokens): "
                     f"{errors[:3]}{'...' if len(errors) > 3 else ''}"
                 )
 
         # Log statistics
-        total_chars = sum(len(c) for c in chunks)
-        avg_size = total_chars // len(chunks)
-        min_size = min(len(c) for c in chunks)
-        max_size = max(len(c) for c in chunks)
+        total_tokens = sum(self.len_fn(c) for c in chunks)
+        avg_size = total_tokens // len(chunks)
+        min_size = min(self.len_fn(c) for c in chunks)
+        max_size = max(self.len_fn(c) for c in chunks)
 
         logger.info(
             f"Chunk statistics: "
@@ -342,7 +349,7 @@ class SemanticChunker:
             f"avg={avg_size}, "
             f"min={min_size}, "
             f"max={max_size}, "
-            f"total={total_chars}"
+            f"total={total_tokens}"
         )
 
 
