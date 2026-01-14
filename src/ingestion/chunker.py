@@ -15,9 +15,9 @@ from chonkie import (
     Chunk,
     CodeChunker,
     MarkdownChef,
-    TableChunker,
-    RecursiveRules,
     OverlapRefinery,
+    RecursiveRules,
+    TableChunker,
 )
 from langchain_text_splitters import (
     ExperimentalMarkdownSyntaxTextSplitter,
