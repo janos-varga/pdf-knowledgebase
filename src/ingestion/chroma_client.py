@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.api import CreateCollectionConfiguration
 from chromadb.api.collection_configuration import CreateHNSWConfiguration
 from chromadb.config import Settings
-from chromadb.api import CreateCollectionConfiguration
 from chromadb.utils.embedding_functions.openai_embedding_function import (
     OpenAIEmbeddingFunction,
 )
@@ -40,6 +40,7 @@ class ChromaDBClient:
         self,
         chromadb_path: Path | None = None,
         collection_name: str | None = None,
+        persist_db: bool = True,
     ):
         """
         Initialize ChromaDB client.
@@ -47,6 +48,7 @@ class ChromaDBClient:
         Args:
             chromadb_path: Path to ChromaDB persistent storage
             collection_name: Name of collection to use
+            persist_db: If True, use PersistentClient; if False, use EphemeralClient (in-memory)
 
         Raises:
             RuntimeError: If ChromaDB initialization fails
@@ -59,11 +61,16 @@ class ChromaDBClient:
 
         # Initialize ChromaDB client
         try:
-            self.client = chromadb.PersistentClient(
-                path=str(self.chromadb_path),
-                settings=Settings(anonymized_telemetry=False),
-            )
-            logger.info(f"ChromaDB client initialized at {self.chromadb_path}")
+            chroma_client_settings = Settings(anonymized_telemetry=False)
+            if persist_db:
+                self.client = chromadb.PersistentClient(
+                    path=str(self.chromadb_path),
+                    settings=chroma_client_settings,
+                )
+                logger.info(f"ChromaDB client initialized at {self.chromadb_path}")
+            else:
+                self.client = chromadb.EphemeralClient(settings=chroma_client_settings)
+                logger.info("ChromaDB in-memory client initialized")
         except Exception as e:
             raise RuntimeError(f"Failed to initialize ChromaDB client: {e}") from e
 
