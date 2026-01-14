@@ -66,6 +66,37 @@ Set logging verbosity:
 python main.py D:\datasheets\components --log-level DEBUG
 ```
 
+### Custom Chunking Parameters
+
+Adjust chunk size and overlap for different document types:
+
+```bash
+# Larger chunks for detailed datasheets
+python main.py D:\datasheets\components --chunk-size 2048 --chunk-overlap 200
+
+# Smaller chunks for concise datasheets
+python main.py D:\datasheets\components --chunk-size 512 --chunk-overlap 50
+```
+
+### In-Memory Database (Experimental)
+
+Use ephemeral ChromaDB for experiments without persisting data:
+
+```bash
+python main.py D:\datasheets\components --in-mem-chroma
+```
+
+## CLI Reference
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `datasheets_folder_path` | Positional | Required | Path to folder containing datasheet subfolders |
+| `--force-update` | Flag | False | Delete and re-ingest existing datasheets |
+| `--log-level` | Choice | INFO | Logging level: DEBUG, INFO, WARNING, ERROR |
+| `--chunk-size` | Integer | 1024 | Target chunk size in tokens |
+| `--chunk-overlap` | Integer | Auto (15%) | Chunk overlap in tokens |
+| `--in-mem-chroma` | Flag | False | Use in-memory ChromaDB (data not persisted) |
+
 ## Folder Structure
 
 Datasheets must follow this structure:
@@ -102,25 +133,13 @@ CHROMADB_COLLECTION=my_datasheets
 
 ### ChromaDB Settings
 
-- **Storage**: Persistent at `CHROMADB_PATH` (configurable)
-- **Collection**: `datasheets` (configurable)
-- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
-- **Similarity Metric**: Cosine similarity
-- **Chunk Size**: 1500 characters target, 2000 max
-
-## Performance
-
-### Targets
-
-- **Single datasheet**: < 30 seconds (20-page document)
-- **Batch (100 datasheets)**: < 30 minutes (avg 15 pages each)
-- **Success rate**: ≥ 95% for well-formed datasheets
-
-### Optimization Tips
-
-1. **CPU-only mode**: Uses CPU-optimized embedding model (no GPU required)
-2. **Parallel processing**: Tasks marked `[P]` can run concurrently
-3. **Incremental updates**: Use `--force-update` only when needed
+- **Storage**: Persistent at `CHROMADB_PATH` (default: `D:\.cache\chromadb`)
+  - Can be overridden with `--in-mem-chroma` for ephemeral storage
+- **Collection**: `datasheets` (configurable via `CHROMADB_COLLECTION`)
+- **Embedding Model**: OpenAI `text-embedding-3-small` (1536 dimensions)
+- **Similarity Metric**: Cosine similarity (HNSW index)
+- **Default Chunk Size**: 1024 tokens (configurable via `--chunk-size`)
+- **Default Chunk Overlap**: Auto (15% of chunk size, configurable via `--chunk-overlap`)
 
 ## Logging
 
