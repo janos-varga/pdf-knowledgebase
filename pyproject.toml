@@ -20,13 +20,7 @@ classifiers = [
 dependencies = [
     "chonkie[all]",
     "chromadb",
-    "langchain",
-    "langchain-chroma",
-    "langchain-community",
     "langchain-text-splitters",
-    "sentence-transformers",
-    "markdown",
-    "torch",
     "tiktoken>=0.12.0",
 ]
 
