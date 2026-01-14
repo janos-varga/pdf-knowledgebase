@@ -65,6 +65,9 @@ Examples:
   # Force update existing datasheets
   python main.py D:\\datasheets\\components --force-update
 
+  # Use in-memory database for experiments (data not persisted)
+  python main.py D:\\datasheets\\components --in-mem-chroma
+
   # Set custom log level
   python main.py D:\\datasheets\\components --log-level DEBUG
 
@@ -100,6 +103,26 @@ Exit Codes:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default=DEFAULT_LOG_LEVEL,
         help=f"Logging level (default: {DEFAULT_LOG_LEVEL})",
+    )
+
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=None,
+        help="Target chunk size in tokens (default: 1024)",
+    )
+
+    parser.add_argument(
+        "--chunk-overlap",
+        type=int,
+        default=None,
+        help="Chunk overlap in tokens (default: 100 tokens)",
+    )
+
+    parser.add_argument(
+        "--in-mem-chroma",
+        action="store_true",
+        help="Use in-memory ChromaDB (for experiments, data not persisted)",
     )
 
     return parser.parse_args()
@@ -140,15 +163,22 @@ def print_banner(
         chromadb_path: Path to ChromaDB storage
         collection_name: Collection name
     """
+    chunk_size_str = str(args.chunk_size) if args.chunk_size else "1024 (default)"
+    chunk_overlap_str = str(args.chunk_overlap) if args.chunk_overlap else "auto (15%)"
+    storage_mode = "In-Memory (Ephemeral)" if args.in_mem_chroma else "Persistent"
+
     banner = f"""
 {"=" * 70}
   Datasheet Ingestion Pipeline
 {"=" * 70}
   Datasheets Folder:  {args.datasheets_folder_path}
-  ChromaDB Path:      {chromadb_path}
+  ChromaDB Path:      {chromadb_path if not args.in_mem_chroma else "N/A (in-memory)"}
   Collection:         {collection_name}
+  Storage Mode:       {storage_mode}
   Force Update:       {"Yes" if args.force_update else "No"}
   Log Level:          {args.log_level}
+  Chunk Size:         {chunk_size_str}
+  Chunk Overlap:      {chunk_overlap_str}
 {"=" * 70}
 """
     print(banner)
@@ -223,7 +253,9 @@ def main() -> int:
 
         if not datasheets:
             logger.warning("[!] No datasheets found in folder.")
-            logger.warning("   Each datasheet should be in its own subfolder with one .md file.")
+            logger.warning(
+                "   Each datasheet should be in its own subfolder with one .md file."
+            )
             return EXIT_VALIDATION_ERROR
 
         logger.info(f"Found {len(datasheets)} datasheets")
@@ -234,6 +266,7 @@ def main() -> int:
             chroma_client = ChromaDBClient(
                 chromadb_path=chromadb_path,
                 collection_name=collection_name,
+                persist_db=not args.in_mem_chroma,
             )
         except RuntimeError as e:
             logger.error(f"ChromaDB initialization error: {e}")
@@ -260,6 +293,8 @@ def main() -> int:
                 datasheets,
                 chroma_client,
                 force_update=args.force_update,
+                chunk_size=args.chunk_size,
+                chunk_overlap=args.chunk_overlap,
             )
         except RuntimeError as e:
             logger.error(f"Batch ingestion error: {e}")

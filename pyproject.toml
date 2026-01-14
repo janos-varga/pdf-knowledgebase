@@ -18,21 +18,16 @@ classifiers = [
 ]
 
 dependencies = [
+    "chonkie[all]",
     "chromadb",
-    "langchain",
-    "langchain-chroma",
-    "langchain-community",
     "langchain-text-splitters",
-    "sentence-transformers",
-    "markdown",
-    "torch",
+    "tiktoken>=0.12.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "ruff>=0.14.11",
 ]
 
 

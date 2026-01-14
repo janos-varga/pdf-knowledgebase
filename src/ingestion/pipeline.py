@@ -122,7 +122,9 @@ def discover_datasheets(folder_path: Path) -> list[Datasheet]:
     # Check if this is a single datasheet folder (has .md file directly)
     md_files = list(folder_path.glob("*.md"))
     if md_files:
-        logger.info(f"Detected single datasheet folder with {len(md_files)} .md file(s)")
+        logger.info(
+            f"Detected single datasheet folder with {len(md_files)} .md file(s)"
+        )
         try:
             datasheet = Datasheet.from_folder(
                 folder_path,
@@ -164,6 +166,8 @@ def ingest_datasheet(
     datasheet: Datasheet,
     chroma_client: ChromaDBClient,
     force_update: bool = False,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
 ) -> IngestionResult:
     """
     Ingest single datasheet: parse → chunk → embed → store.
@@ -174,6 +178,8 @@ def ingest_datasheet(
         datasheet: Datasheet instance to ingest
         chroma_client: ChromaDB client for storage
         force_update: If True, delete existing chunks before re-ingestion
+        chunk_size: Target chunk size in tokens (default: None, uses chunker default)
+        chunk_overlap: Chunk overlap in tokens (default: None, uses chunker default)
 
     Returns:
         IngestionResult with status and metrics
@@ -221,7 +227,7 @@ def ingest_datasheet(
 
         # Step 3: Chunk content
         logger.debug(f"Chunking content for: {datasheet.name}")
-        chunker = create_chunker()
+        chunker = create_chunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         text_chunks = chunker.chunk_markdown(content)
 
         # Step 4: Create ContentChunk instances
@@ -301,6 +307,8 @@ def ingest_batch(
     datasheets: list[Datasheet],
     chroma_client: ChromaDBClient,
     force_update: bool = False,
+    chunk_size: int | None = None,
+    chunk_overlap: int | None = None,
 ) -> BatchIngestionReport:
     """
     Ingest batch of datasheets with error handling and progress logging.
@@ -311,6 +319,8 @@ def ingest_batch(
         datasheets: List of datasheets to ingest
         chroma_client: ChromaDB client for storage
         force_update: If True, delete existing chunks before re-ingestion
+        chunk_size: Target chunk size in tokens (default: None, uses chunker default)
+        chunk_overlap: Chunk overlap in tokens (default: None, uses chunker default)
 
     Returns:
         BatchIngestionReport with summary and per-datasheet results
@@ -333,7 +343,9 @@ def ingest_batch(
         logger.info(f"[{i}/{len(datasheets)}] Processing: {datasheet.name}")
 
         try:
-            result = ingest_datasheet(datasheet, chroma_client, force_update)
+            result = ingest_datasheet(
+                datasheet, chroma_client, force_update, chunk_size, chunk_overlap
+            )
             results.append(result)
 
             # Log progress

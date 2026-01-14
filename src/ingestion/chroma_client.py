@@ -13,7 +13,12 @@ from pathlib import Path
 from typing import Any
 
 import chromadb
+from chromadb.api import CreateCollectionConfiguration
+from chromadb.api.collection_configuration import CreateHNSWConfiguration
 from chromadb.config import Settings
+from chromadb.utils.embedding_functions.openai_embedding_function import (
+    OpenAIEmbeddingFunction,
+)
 
 from src.models import ContentChunk
 
@@ -35,6 +40,7 @@ class ChromaDBClient:
         self,
         chromadb_path: Path | None = None,
         collection_name: str | None = None,
+        persist_db: bool = True,
     ):
         """
         Initialize ChromaDB client.
@@ -42,6 +48,7 @@ class ChromaDBClient:
         Args:
             chromadb_path: Path to ChromaDB persistent storage
             collection_name: Name of collection to use
+            persist_db: If True, use PersistentClient; if False, use EphemeralClient (in-memory)
 
         Raises:
             RuntimeError: If ChromaDB initialization fails
@@ -54,11 +61,16 @@ class ChromaDBClient:
 
         # Initialize ChromaDB client
         try:
-            self.client = chromadb.PersistentClient(
-                path=str(self.chromadb_path),
-                settings=Settings(anonymized_telemetry=False),
-            )
-            logger.info(f"ChromaDB client initialized at {self.chromadb_path}")
+            chroma_client_settings = Settings(anonymized_telemetry=False)
+            if persist_db:
+                self.client = chromadb.PersistentClient(
+                    path=str(self.chromadb_path),
+                    settings=chroma_client_settings,
+                )
+                logger.info(f"ChromaDB client initialized at {self.chromadb_path}")
+            else:
+                self.client = chromadb.EphemeralClient(settings=chroma_client_settings)
+                logger.info("ChromaDB in-memory client initialized")
         except Exception as e:
             raise RuntimeError(f"Failed to initialize ChromaDB client: {e}") from e
 
@@ -75,16 +87,21 @@ class ChromaDBClient:
         Raises:
             RuntimeError: If collection initialization fails
         """
+        hnsw_config = CreateHNSWConfiguration(space="cosine")
+        ef = OpenAIEmbeddingFunction(model_name="text-embedding-3-small")
+        config = CreateCollectionConfiguration(hnsw=hnsw_config, embedding_function=ef)
         try:
             collection = self.client.get_or_create_collection(
                 name=self.collection_name,
+                configuration=config,
+                embedding_function=ef,
                 metadata={
                     "hnsw:space": "cosine",  # Cosine similarity for embeddings
                     "description": "Electrical component datasheets for PCB design",
-                    "embedding_model": "all-MiniLM-L6-v2",
-                    "embedding_dimensions": 384,
+                    "embedding_model": "text-embedding-3-small",
+                    "embedding_dimensions": 1536,
                     "chunking_strategy": "two-stage-semantic",
-                    "chunk_size_target": 1500,
+                    "chunk_size_target": 4000,
                     "chunk_overlap_percent": 15,
                     "schema_version": "1.0.0",
                 },
@@ -265,9 +282,3 @@ class ChromaDBClient:
             return False, f"Cannot access collection '{self.collection_name}': {e}"
 
         return True, None
-
-    def close(self):
-        """Close ChromaDB client connection."""
-        # ChromaDB client doesn't require explicit closing,
-        # but this method is provided for future compatibility
-        logger.info("ChromaDB client closed")

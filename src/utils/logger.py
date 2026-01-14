@@ -9,7 +9,7 @@ Provides dual-output logging:
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ class JSONFormatter(logging.Formatter):
             JSON-formatted log string
         """
         log_data = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -143,7 +143,7 @@ def setup_logging(
     if log_file is None:
         log_dir = Path(".logs")
         log_dir.mkdir(exist_ok=True)
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"ingestion_{timestamp}.json"
 
     # Ensure log directory exists

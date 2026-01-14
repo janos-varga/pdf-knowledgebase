@@ -10,6 +10,15 @@ Ensures tables and code blocks remain intact within single chunks.
 
 import logging
 
+import tiktoken
+from chonkie import (
+    Chunk,
+    CodeChunker,
+    MarkdownChef,
+    OverlapRefinery,
+    RecursiveRules,
+    TableChunker,
+)
 from langchain_text_splitters import (
     ExperimentalMarkdownSyntaxTextSplitter,
     RecursiveCharacterTextSplitter,
@@ -17,12 +26,9 @@ from langchain_text_splitters import (
 
 logger = logging.getLogger("datasheet_ingestion.chunker")
 
-
 # Configuration constants
-CHUNK_SIZE_TARGET = 1500  # Target chunk size in characters
-CHUNK_SIZE_MAX = 4000  # Maximum chunk size (hard limit for embeddings)
-CHUNK_OVERLAP = 225  # 15% of target size
-CHUNK_OVERLAP_PERCENT = 15
+CHUNK_SIZE_TARGET = 1024  # Target chunk size in characters (hard limit)
+CHUNK_OVERLAP = 100  # Overlap for context
 
 
 class SemanticChunker:
@@ -37,19 +43,16 @@ class SemanticChunker:
         self,
         chunk_size: int = CHUNK_SIZE_TARGET,
         chunk_overlap: int = CHUNK_OVERLAP,
-        max_chunk_size: int = CHUNK_SIZE_MAX,
     ):
         """
         Initialize semantic chunker with configuration.
 
         Args:
-            chunk_size: Target chunk size in characters
+            chunk_size: Target chunk size in characters (hard limit)
             chunk_overlap: Overlap between chunks in characters
-            max_chunk_size: Maximum allowed chunk size (for warnings)
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
-        self.max_chunk_size = max_chunk_size
 
         # Stage 1: Markdown syntax-aware splitter
         self.markdown_splitter = ExperimentalMarkdownSyntaxTextSplitter(
@@ -57,7 +60,10 @@ class SemanticChunker:
         )
 
         # Stage 2: Recursive character splitter
-        self.char_splitter = RecursiveCharacterTextSplitter(
+        enc_name = tiktoken.encoding_name_for_model("text-embedding-3-small")
+        self.tokenizer = tiktoken.get_encoding(enc_name)
+        self.char_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+            encoding_name=enc_name,
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
             separators=[
@@ -67,12 +73,13 @@ class SemanticChunker:
                 " ",
                 "",
             ],  # Prefer paragraph/sentence breaks
-            length_function=len,
         )
+        # We should count lengths in tokens, not characters
+        self.len_fn = self.char_splitter._length_function
 
         logger.info(
             f"SemanticChunker initialized: "
-            f"target={chunk_size}, overlap={chunk_overlap}, max={max_chunk_size}"
+            f"target={chunk_size}, overlap={chunk_overlap}"
         )
 
     def chunk_markdown(self, content: str) -> list[str]:
@@ -81,6 +88,7 @@ class SemanticChunker:
 
         Stage 1: Split by markdown syntax (preserves tables, code blocks, sections)
         Stage 2: Further split large groups while respecting boundaries
+        Stage 3: Chonkie Refinery to improve context retention
 
         Args:
             content: Markdown content to chunk
@@ -94,20 +102,43 @@ class SemanticChunker:
         if not content or not content.strip():
             raise ValueError("Cannot chunk empty content")
 
-        logger.debug(f"Starting two-stage chunking for content ({len(content)} chars)")
+        logger.debug(
+            f"Starting two-stage chunking for content ({len(content)} chars), "
+            f"{self.len_fn} tokens"
+        )
 
         # Stage 1: Markdown structure preservation
         markdown_groups = self._stage1_markdown_split(content)
 
         # Stage 2: Intelligent character-level splitting
-        final_chunks = self._stage2_recursive_split(markdown_groups)
+        split_chunks = self._stage2_recursive_split(markdown_groups)
+
+        # Stage 3: use Chonkie OverlapRefinery for better context retention
+        # Requires converting our chunks to Chonkie Chunks and back
+        rec_rules = RecursiveRules.from_recipe("markdown")
+        overlap_refinery = OverlapRefinery(
+            tokenizer=self.tokenizer,
+            context_size=self.chunk_size,
+            mode="recursive",
+            rules=rec_rules,
+        )
+        refined_chunks: list[Chunk] = overlap_refinery.refine(
+            [
+                Chunk(
+                    text=c, start_index=0, end_index=len(c), token_count=self.len_fn(c)
+                )
+                for c in split_chunks
+            ]
+        )
+        final_chunks = [c.text for c in refined_chunks]
 
         # Validate and log results
         self._validate_chunks(final_chunks)
 
         logger.info(
             f"Chunking complete: {len(final_chunks)} chunks created "
-            f"(avg {sum(len(c) for c in final_chunks) // len(final_chunks)} chars)"
+            f"(avg {sum(len(c) for c in final_chunks) // len(final_chunks)} chars), "
+            f"(avg {sum(self.len_fn(c) for c in final_chunks) // len(final_chunks)} tokens)."
         )
 
         return final_chunks
@@ -185,7 +216,7 @@ class SemanticChunker:
         Split group while protecting tables and code blocks from mid-content splits.
 
         Strategy:
-            1. If entire group fits in max_chunk_size, keep as single chunk
+            1. If entire group fits in chunk_size, keep as single chunk
             2. Otherwise, try to split at paragraph boundaries outside protected areas
             3. If that fails, log warning and keep as single chunk (may exceed limit)
 
@@ -195,26 +226,19 @@ class SemanticChunker:
         Returns:
             List of chunks (usually 1 chunk to preserve structure)
         """
-        group_size = len(group)
+        group_size = self.len_fn(group)
 
-        # If group fits within max size, keep it intact
-        if group_size <= self.max_chunk_size:
+        # If group fits within target size, keep it intact
+        if group_size <= self.chunk_size:
             logger.debug(
                 f"Protected group kept intact ({group_size} chars, "
-                f"within {self.max_chunk_size} limit)"
+                f"within {self.chunk_size} limit)"
             )
             return [group]
 
-        # If group is too large, log warning
-        if group_size > self.max_chunk_size:
-            logger.warning(
-                f"Protected group exceeds maximum chunk size: "
-                f"{group_size} > {self.max_chunk_size}. "
-                f"Table or code block may be truncated by embedding model."
-            )
-
-            # Try to split at paragraph boundaries outside protected areas
-            # This is a best-effort attempt
+        # If group is too large
+        # Use Chonkie's table chunker to attempt safe split
+        if group_size > self.chunk_size:
             try:
                 chunks = self._split_outside_protected_areas(group)
                 if chunks:
@@ -245,12 +269,60 @@ class SemanticChunker:
             The RecursiveCharacterTextSplitter cannot safely split tables without
             separating table captions from table data, which breaks semantic queries.
         """
-        # TODO: Implement sophisticated table/code block boundary detection
-        # For now, return empty list to keep tables intact as single chunks
-        logger.debug(
-            "Skipping split of protected content to preserve table integrity"
-        )
-        return []
+        logger.info("Calling Chonkie tools to split table/code.")
+        chunks = []
+
+        # Use MarkdownChef to parse document to ensure we attend to tables and code blocks,
+        # and preserve other elements.
+        mc = MarkdownChef(tokenizer=self.tokenizer)
+        mc_doc = mc.parse(group)
+
+        # Table chunking is simply done by TableChunker
+        tbl_chunker = TableChunker(tokenizer="row", chunk_size=3)
+        chunked_doc = tbl_chunker.chunk_document(mc_doc)
+
+        # Code block chunking requires special treatment because we want to
+        # support multiple code blocks per chunked document, in multiple languages.
+        # But CodeChunker doesn't take MarkdownCode as an input, only raw text, or
+        # the whole MarkdownDocument, assuming all code blocks are in the same language.
+        # However, MarkdownChef detects the language and records it per block.
+        for code_block in chunked_doc.code:
+            # Initialize CodeChunker for this code block's language.
+            code_chunker = CodeChunker(
+                tokenizer=self.tokenizer,
+                chunk_size=CHUNK_SIZE_TARGET,
+                language=code_block.language,
+            )
+            # Run the CodeChunker on the individual code block content.
+            new_chunks: list[Chunk] = code_chunker.chunk(code_block.content)
+            for new_chunk in new_chunks:
+                chunked_doc.chunks.append(
+                    Chunk(
+                        text=new_chunk.text,
+                        start_index=new_chunk.start_index + code_block.start_index,
+                        end_index=new_chunk.end_index + code_block.start_index,
+                        token_count=new_chunk.token_count,
+                    ),
+                )
+
+        # MarkdownChef removes images from the text, so we need to add them back
+        for image in chunked_doc.images:
+            chunked_doc.chunks.append(
+                Chunk(
+                    text=f"![{image.alias}]({image.content})",
+                    start_index=image.start_index,
+                    end_index=image.end_index,
+                    token_count=self.len_fn(image.markdown),
+                ),
+            )
+
+        chunked_doc.chunks.sort(key=lambda x: x.start_index)
+
+        # Lastly, extract the chunk texts and return them as our chunks
+        for chunk in chunked_doc.chunks:
+            chunks.append(chunk.text)
+
+        return chunks
 
     def _contains_table(self, text: str) -> bool:
         """
@@ -306,35 +378,23 @@ class SemanticChunker:
 
         # Check for oversized chunks
         oversized = [
-            (i, len(c)) for i, c in enumerate(chunks) if len(c) > self.chunk_size
+            (i, self.len_fn(c))
+            for i, c in enumerate(chunks)
+            if self.len_fn(c) > self.chunk_size
         ]
 
         if oversized:
-            # Log warnings for chunks between target and max
-            warnings = [
-                (i, size) for i, size in oversized if size <= self.max_chunk_size
-            ]
-            if warnings:
-                logger.warning(
-                    f"Found {len(warnings)} chunks exceeding target size "
-                    f"({self.chunk_size} chars) but within max ({self.max_chunk_size}): "
-                    f"{warnings[:3]}{'...' if len(warnings) > 3 else ''}"
-                )
-
-            # Log errors for chunks exceeding max
-            errors = [(i, size) for i, size in oversized if size > self.max_chunk_size]
-            if errors:
-                logger.error(
-                    f"Found {len(errors)} chunks exceeding maximum size "
-                    f"({self.max_chunk_size} chars): "
-                    f"{errors[:3]}{'...' if len(errors) > 3 else ''}"
-                )
+            logger.error(
+                f"Found {len(oversized)} chunks exceeding chunk size "
+                f"({self.chunk_size} tokens): "
+                f"{oversized[:3]}{'...' if len(oversized) > 3 else ''}"
+            )
 
         # Log statistics
-        total_chars = sum(len(c) for c in chunks)
-        avg_size = total_chars // len(chunks)
-        min_size = min(len(c) for c in chunks)
-        max_size = max(len(c) for c in chunks)
+        total_tokens = sum(self.len_fn(c) for c in chunks)
+        avg_size = total_tokens // len(chunks)
+        min_size = min(self.len_fn(c) for c in chunks)
+        max_size = max(self.len_fn(c) for c in chunks)
 
         logger.info(
             f"Chunk statistics: "
@@ -342,7 +402,7 @@ class SemanticChunker:
             f"avg={avg_size}, "
             f"min={min_size}, "
             f"max={max_size}, "
-            f"total={total_chars}"
+            f"total={total_tokens}"
         )
 
 

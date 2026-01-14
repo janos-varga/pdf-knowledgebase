@@ -124,4 +124,4 @@ class ContentChunk:
         if self.source_page_hint:
             metadata["source_page_hint"] = self.source_page_hint
 
-        return (self.text, metadata)
+        return self.text, metadata
