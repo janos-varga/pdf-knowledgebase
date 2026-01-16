@@ -33,7 +33,7 @@ CHUNK_OVERLAP = 100  # Overlap for context
 
 class SemanticChunker:
     """
-    Two-stage semantic chunker for markdown documents.
+    Two-stage semantic chunker for Markdown documents.
 
     Preserves document structure (headers, tables, code blocks) while
     intelligently splitting content for optimal embedding quality.
@@ -84,9 +84,9 @@ class SemanticChunker:
 
     def chunk_markdown(self, content: str) -> list[str]:
         """
-        Chunk markdown content using two-stage semantic splitting.
+        Chunk Markdown content using two-stage semantic splitting.
 
-        Stage 1: Split by markdown syntax (preserves tables, code blocks, sections)
+        Stage 1: Split by Markdown syntax (preserves tables, code blocks, sections)
         Stage 2: Further split large groups while respecting boundaries
         Stage 3: Chonkie Refinery to improve context retention
 
@@ -117,7 +117,7 @@ class SemanticChunker:
         # Requires converting our chunks to Chonkie Chunks and back
         rec_rules = RecursiveRules.from_recipe("markdown")
         overlap_refinery = OverlapRefinery(
-            tokenizer=self.tokenizer,
+            tokenizer=self.tokenizer,  # type: ignore[arg-type]
             context_size=self.chunk_size,
             mode="recursive",
             rules=rec_rules,
@@ -145,7 +145,7 @@ class SemanticChunker:
 
     def _stage1_markdown_split(self, content: str) -> list[str]:
         """
-        Stage 1: Split markdown by syntax boundaries.
+        Stage 1: Split Markdown by syntax boundaries.
 
         Preserves tables, code blocks, and section structure.
 
@@ -153,7 +153,7 @@ class SemanticChunker:
             content: Markdown content
 
         Returns:
-            List of markdown groups (may be large)
+            List of Markdown groups (can be large)
         """
         try:
             # LangChain text splitters return Document objects, extract text
@@ -180,7 +180,7 @@ class SemanticChunker:
         Tables and code blocks are protected from mid-content splits.
 
         Args:
-            groups: List of markdown groups from Stage 1
+            groups: List of Markdown groups from Stage 1
 
         Returns:
             List of final chunks
@@ -269,12 +269,12 @@ class SemanticChunker:
             The RecursiveCharacterTextSplitter cannot safely split tables without
             separating table captions from table data, which breaks semantic queries.
         """
-        logger.info("Calling Chonkie tools to split table/code.")
+        logger.debug("Calling Chonkie tools to split table/code.")
         chunks = []
 
         # Use MarkdownChef to parse document to ensure we attend to tables and code blocks,
         # and preserve other elements.
-        mc = MarkdownChef(tokenizer=self.tokenizer)
+        mc = MarkdownChef(tokenizer=self.tokenizer)  # type: ignore[arg-type]
         mc_doc = mc.parse(group)
 
         # Table chunking is simply done by TableChunker
@@ -289,7 +289,7 @@ class SemanticChunker:
         for code_block in chunked_doc.code:
             # Initialize CodeChunker for this code block's language.
             code_chunker = CodeChunker(
-                tokenizer=self.tokenizer,
+                tokenizer=self.tokenizer,  # type: ignore[arg-type]
                 chunk_size=CHUNK_SIZE_TARGET,
                 language=code_block.language,
             )
@@ -312,7 +312,7 @@ class SemanticChunker:
                     text=f"![{image.alias}]({image.content})",
                     start_index=image.start_index,
                     end_index=image.end_index,
-                    token_count=self.len_fn(image.markdown),
+                    token_count=self.len_fn(image.content) + self.len_fn(image.alias),
                 ),
             )
 
@@ -324,9 +324,10 @@ class SemanticChunker:
 
         return chunks
 
-    def _contains_table(self, text: str) -> bool:
+    @staticmethod
+    def _contains_table(text: str) -> bool:
         """
-        Check if text contains markdown table.
+        Check if text contains Markdown table.
 
         Args:
             text: Text to check
@@ -341,7 +342,8 @@ class SemanticChunker:
         ]
         return len(table_lines) >= 2  # At least header + one row
 
-    def _contains_code_block(self, text: str) -> bool:
+    @staticmethod
+    def _contains_code_block(text: str) -> bool:
         """
         Check if text contains code block.
 

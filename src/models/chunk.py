@@ -8,6 +8,8 @@ Contains:
 import re
 from dataclasses import dataclass, field
 
+import tiktoken
+
 
 @dataclass
 class ContentChunk:
@@ -37,6 +39,7 @@ class ContentChunk:
     section_heading: str | None = None
     image_paths: list[str] = field(default_factory=list)
     source_page_hint: int | None = None
+    token_count: int = 0
 
     def __post_init__(self):
         """Validate chunk attributes and auto-detect metadata."""
@@ -58,6 +61,10 @@ class ContentChunk:
         # Extract section heading if not provided
         if self.section_heading is None:
             self.section_heading = self._extract_section_heading()
+
+        enc_name = tiktoken.encoding_name_for_model("text-embedding-3-small")
+        tokenizer = tiktoken.get_encoding(enc_name)
+        self.token_count = len(tokenizer.encode(self.text))
 
     def _contains_table(self) -> bool:
         """
@@ -84,15 +91,15 @@ class ContentChunk:
 
     def _extract_section_heading(self) -> str | None:
         """
-        Extract first markdown heading from chunk.
+        Extract first Markdown heading from chunk.
 
         Returns:
-            Section heading text (without markdown syntax), or None
+            Section heading text (without Markdown syntax), or None
         """
         lines = self.text.split("\n")
         for line in lines:
             if line.strip().startswith("#"):
-                # Remove markdown heading syntax
+                # Remove Markdown heading syntax
                 heading = re.sub(r"^#+\s*", "", line.strip())
                 return heading[:100]  # Limit heading length
         return None

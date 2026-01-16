@@ -17,6 +17,7 @@ This pipeline enables engineers to build a searchable knowledge base of componen
 ✅ **Error Handling** - Graceful error recovery with actionable feedback  
 ✅ **Performance Tracking** - Logs timing and warns when targets are exceeded  
 ✅ **Structured Logging** - Human-readable console + JSON file output  
+✅ **Performance Evaluation** - RAGAS-based evaluation for optimizing chunk sizes
 
 ## Requirements
 
@@ -157,6 +158,40 @@ Structured JSON logs are saved to `.logs/ingestion_{timestamp}.json`:
   "chunks_created": 9
 }
 ```
+
+## Performance Evaluation
+
+The `evaluation/` folder contains tools for evaluating and optimizing RAG configurations using RAGAS metrics.
+
+### Quick Evaluation
+
+```bash
+# Run quick test with 5 Q&A pairs
+uv run python evaluation/quick_test.py
+
+# Run full evaluation with all configurations
+uv run python evaluation/evaluate_rag.py
+```
+
+### Dynamic Configuration
+
+The evaluation system uses `evaluation/experiments.csv` to control all pipeline parameters. Column headers are automatically converted to function arguments (e.g., `chunk-size` → `chunk_size`), allowing complete control without code changes.
+
+**Adding new parameters:**
+1. Add CLI argument in `src/cli/ingest.py`
+2. Add parameter to `ingest_batch()` in `src/ingestion/pipeline.py`
+3. Add column to `evaluation/experiments.csv`
+4. No changes needed in `evaluate_rag.py`!
+
+### Metrics Evaluated
+
+- **Faithfulness**: Hallucination avoidance (0.0-1.0)
+- **Answer Relevancy**: Answer relevance to question (0.0-1.0)
+- **Factual Correctness**: Answer accuracy (0.0-1.0)
+- **Context Relevance**: Retrieval quality (0.0-1.0)
+- **Summary Score**: Overall response quality (0.0-1.0)
+
+See [`evaluation/README.md`](src/evaluation/README.md) for detailed documentation.
 
 ## Exit Codes
 

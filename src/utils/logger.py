@@ -268,10 +268,10 @@ def log_datasheet_status(
     }
 
     if duration_seconds is not None:
-        metadata["duration_seconds"] = round(duration_seconds, 2)
+        metadata["duration_seconds"] = str(round(duration_seconds, 2))
 
     if chunks_created is not None:
-        metadata["chunks_created"] = chunks_created
+        metadata["chunks_created"] = str(chunks_created)
 
     if error_message:
         metadata["error_message"] = error_message

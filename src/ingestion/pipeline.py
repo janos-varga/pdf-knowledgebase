@@ -33,6 +33,7 @@ logger = logging.getLogger("datasheet_ingestion.pipeline")
 
 # Performance target: 30 seconds per datasheet
 PERFORMANCE_TARGET_SECONDS = 30.0
+EMBEDDING_MODEL_TOKEN_LIMIT = 100000
 
 
 def _filter_chunk_image_paths(
@@ -162,6 +163,238 @@ def discover_datasheets(folder_path: Path) -> list[Datasheet]:
     return datasheets
 
 
+def _check_duplicate_datasheet(
+    datasheet_name: str,
+    chroma_client: ChromaDBClient,
+    force_update: bool,
+) -> tuple[bool, int]:
+    """
+    Check if datasheet exists and handle force_update logic.
+
+    Args:
+        datasheet_name: Name of the datasheet
+        chroma_client: ChromaDB client
+        force_update: Whether to delete existing chunks
+
+    Returns:
+        Tuple of (should_skip, deleted_count)
+    """
+    exists = chroma_client.datasheet_exists(datasheet_name)
+
+    if not force_update and exists:
+        logger.info(f"Datasheet already exists, skipping: {datasheet_name}")
+        return True, 0
+
+    if force_update and exists:
+        logger.info(f"Force update: deleting existing chunks for {datasheet_name}")
+        deleted_count = chroma_client.delete_datasheet(datasheet_name)
+        logger.info(f"Deleted {deleted_count} existing chunks")
+        return False, deleted_count
+
+    return False, 0
+
+
+def _parse_and_resolve_content(
+    datasheet: Datasheet,
+) -> tuple[str, list[Path]]:
+    """
+    Parse markdown and resolve image paths.
+
+    Args:
+        datasheet: Datasheet to process
+
+    Returns:
+        Tuple of (content, resolved_images)
+    """
+    logger.debug(f"Parsing markdown: {datasheet.markdown_file_path}")
+    content = parse_markdown_file(datasheet.markdown_file_path)
+
+    logger.debug(f"Resolving image paths for: {datasheet.name}")
+    content, resolved_images = resolve_all_image_paths(
+        content,
+        datasheet.markdown_file_path,
+    )
+
+    return content, resolved_images
+
+
+def _create_text_chunks(
+    content: str,
+    chunk_size: int | None,
+    chunk_overlap: int | None,
+) -> list[str]:
+    """
+    Chunk markdown content.
+
+    Args:
+        content: Markdown content to chunk
+        chunk_size: Target chunk size in tokens
+        chunk_overlap: Chunk overlap in tokens
+
+    Returns:
+        List of text chunks
+    """
+    logger.debug("Chunking content")
+    chunker = create_chunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    return chunker.chunk_markdown(content)
+
+
+def _build_content_chunks(
+    text_chunks: list[str],
+    datasheet: Datasheet,
+    resolved_images: list[Path],
+) -> list[ContentChunk]:
+    """
+    Create ContentChunk instances from text chunks.
+
+    Args:
+        text_chunks: List of text chunks
+        datasheet: Source datasheet
+        resolved_images: All resolved image paths
+
+    Returns:
+        List of ContentChunk instances
+    """
+    logger.debug(f"Creating {len(text_chunks)} ContentChunk instances")
+    chunks = []
+
+    for idx, text in enumerate(text_chunks):
+        chunk_image_paths = _filter_chunk_image_paths(text, resolved_images)
+
+        chunk = ContentChunk(
+            text=text,
+            datasheet_name=datasheet.name,
+            folder_path=str(datasheet.folder_path),
+            chunk_index=idx,
+            ingestion_timestamp=datasheet.ingestion_timestamp.isoformat() + "Z",
+            image_paths=chunk_image_paths,
+        )
+        chunks.append(chunk)
+
+    return chunks
+
+
+def _insert_chunks_with_batching(
+    chunks: list[ContentChunk],
+    chroma_client: ChromaDBClient,
+) -> tuple[int, int]:
+    """
+    Insert chunks into ChromaDB with automatic batching for large datasheets.
+
+    Args:
+        chunks: List of chunks to insert
+        chroma_client: ChromaDB client
+
+    Returns:
+        Tuple of (inserted_chunks, inserted_token_count)
+    """
+    total_tokens = sum(chunk.token_count for chunk in chunks)
+
+    if total_tokens > EMBEDDING_MODEL_TOKEN_LIMIT:
+        logger.debug(
+            "Large datasheet detected, inserting in batches to avoid API overload"
+        )
+        return _insert_chunks_in_batches(chunks, chroma_client)
+    else:
+        logger.debug(f"Inserting {len(chunks)} chunks into ChromaDB")
+        inserted_chunks = chroma_client.insert_chunks(chunks)
+        inserted_token_count = sum(chunk.token_count for chunk in chunks)
+        return inserted_chunks, inserted_token_count
+
+
+def _insert_chunks_in_batches(
+    chunks: list[ContentChunk],
+    chroma_client: ChromaDBClient,
+) -> tuple[int, int]:
+    """
+    Insert chunks in batches to respect embedding model token limits.
+
+    Args:
+        chunks: List of chunks to insert
+        chroma_client: ChromaDB client
+
+    Returns:
+        Tuple of (inserted_chunks, inserted_token_count)
+    """
+    batch = []
+    current_batch_token_count = 0
+    inserted_chunks = 0
+    inserted_token_count = 0
+
+    for chunk in chunks:
+        if (
+            current_batch_token_count + chunk.token_count
+            > EMBEDDING_MODEL_TOKEN_LIMIT
+        ):
+            logger.debug(f"Inserting batch of {len(batch)} chunks into ChromaDB")
+            inserted_chunks += chroma_client.insert_chunks(batch)
+            inserted_token_count += sum(c.token_count for c in batch)
+
+            batch = [chunk]
+            current_batch_token_count = chunk.token_count
+        else:
+            batch.append(chunk)
+            current_batch_token_count += chunk.token_count
+
+    if batch:
+        logger.debug(f"Inserting final batch of {len(batch)} chunks into ChromaDB")
+        inserted_chunks += chroma_client.insert_chunks(batch)
+        inserted_token_count += sum(c.token_count for c in batch)
+
+    logger.debug(f"Total inserted tokens: {inserted_token_count}")
+    return inserted_chunks, inserted_token_count
+
+
+def _update_datasheet_status(
+    datasheet: Datasheet,
+    inserted_chunks: int,
+    inserted_token_count: int,
+    duration: float,
+) -> None:
+    """
+    Update datasheet with ingestion results.
+
+    Args:
+        datasheet: Datasheet to update
+        inserted_chunks: Number of chunks inserted
+        inserted_token_count: Total token count
+        duration: Ingestion duration in seconds
+    """
+    datasheet.status = IngestionStatus.SUCCESS
+    datasheet.chunk_count = inserted_chunks
+    datasheet.token_count = inserted_token_count
+    datasheet.duration_seconds = duration
+
+
+def _log_completion(
+    datasheet_name: str,
+    chunk_count: int,
+    token_count: int,
+    duration: float,
+) -> None:
+    """
+    Log ingestion completion with performance metrics.
+
+    Args:
+        datasheet_name: Name of the datasheet
+        chunk_count: Number of chunks created
+        token_count: Total token count
+        duration: Ingestion duration in seconds
+    """
+    if duration > PERFORMANCE_TARGET_SECONDS:
+        logger.warning(
+            f"[!] Ingestion exceeded {PERFORMANCE_TARGET_SECONDS}s target: "
+            f"{datasheet_name} took {duration:.2f}s"
+        )
+    else:
+        logger.info(
+            f"[OK] Ingestion complete: {datasheet_name} "
+            f"{chunk_count} chunks, {token_count} tokens, {duration:.2f}s)"
+        )
+
+    logger.info("-" * 70)
+
+
 def ingest_datasheet(
     datasheet: Datasheet,
     chroma_client: ChromaDBClient,
@@ -193,14 +426,13 @@ def ingest_datasheet(
     logger.info(f"Starting ingestion: {datasheet.name}")
 
     try:
-        # Check for duplicates (unless force_update)
-        if not force_update and chroma_client.datasheet_exists(datasheet.name):
-            logger.info(f"Datasheet already exists, skipping: {datasheet.name}")
+        should_skip, _ = _check_duplicate_datasheet(
+            datasheet.name, chroma_client, force_update
+        )
+
+        if should_skip:
             duration = time.time() - start_time
-
-            # Print separator after skipped datasheet
             logger.info("-" * 70)
-
             return IngestionResult(
                 datasheet_name=datasheet.name,
                 status=IngestionStatus.SKIPPED,
@@ -208,77 +440,30 @@ def ingest_datasheet(
                 skipped_reason="Datasheet already exists in ChromaDB (use --force-update to overwrite)",
             )
 
-        # If force_update, delete existing chunks
-        if force_update and chroma_client.datasheet_exists(datasheet.name):
-            logger.info(f"Force update: deleting existing chunks for {datasheet.name}")
-            deleted_count = chroma_client.delete_datasheet(datasheet.name)
-            logger.info(f"Deleted {deleted_count} existing chunks")
+        # Parse and resolve content
+        content, resolved_images = _parse_and_resolve_content(datasheet)
 
-        # Step 1: Parse markdown
-        logger.debug(f"Parsing markdown: {datasheet.markdown_file_path}")
-        content = parse_markdown_file(datasheet.markdown_file_path)
+        # Chunk content
+        text_chunks = _create_text_chunks(content, chunk_size, chunk_overlap)
+        chunks = _build_content_chunks(text_chunks, datasheet, resolved_images)
 
-        # Step 2: Resolve image paths
-        logger.debug(f"Resolving image paths for: {datasheet.name}")
-        content, resolved_images = resolve_all_image_paths(
-            content,
-            datasheet.markdown_file_path,
+        # Insert chunks into ChromaDB with batching if needed
+        inserted_chunks, inserted_token_count = _insert_chunks_with_batching(
+            chunks, chroma_client
         )
 
-        # Step 3: Chunk content
-        logger.debug(f"Chunking content for: {datasheet.name}")
-        chunker = create_chunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        text_chunks = chunker.chunk_markdown(content)
-
-        # Step 4: Create ContentChunk instances
-        logger.debug(f"Creating {len(text_chunks)} ContentChunk instances")
-        chunks = []
-        for idx, text in enumerate(text_chunks):
-            # Filter image paths to only those referenced in this chunk
-            chunk_image_paths = _filter_chunk_image_paths(text, resolved_images)
-
-            chunk = ContentChunk(
-                text=text,
-                datasheet_name=datasheet.name,
-                folder_path=str(datasheet.folder_path),
-                chunk_index=idx,
-                ingestion_timestamp=datasheet.ingestion_timestamp.isoformat() + "Z",
-                image_paths=chunk_image_paths,
-            )
-            chunks.append(chunk)
-
-        # Step 5: Insert into ChromaDB (embeddings auto-generated)
-        logger.debug(f"Inserting {len(chunks)} chunks into ChromaDB")
-        inserted_count = chroma_client.insert_chunks(chunks)
-
-        # Calculate duration
         duration = time.time() - start_time
-
-        # Update datasheet status
-        datasheet.status = IngestionStatus.SUCCESS
-        datasheet.chunk_count = inserted_count
-        datasheet.duration_seconds = duration
-
-        # Log performance
-        if duration > PERFORMANCE_TARGET_SECONDS:
-            logger.warning(
-                f"[!] Ingestion exceeded {PERFORMANCE_TARGET_SECONDS}s target: "
-                f"{datasheet.name} took {duration:.2f}s"
-            )
-        else:
-            logger.info(
-                f"[OK] Ingestion complete: {datasheet.name} "
-                f"({inserted_count} chunks, {duration:.2f}s)"
-            )
-
-        # Print separator after datasheet completion
-        logger.info("-" * 70)
+        _update_datasheet_status(
+            datasheet, inserted_chunks, inserted_token_count, duration
+        )
+        _log_completion(datasheet.name, len(chunks), inserted_token_count, duration)
 
         return IngestionResult(
             datasheet_name=datasheet.name,
             status=IngestionStatus.SUCCESS,
             duration_seconds=duration,
-            chunks_created=inserted_count,
+            chunks_created=inserted_chunks,
+            tokens_inserted=inserted_token_count,
         )
 
     except Exception as e:
@@ -291,8 +476,6 @@ def ingest_datasheet(
             f"[X] Ingestion failed: {datasheet.name} - {e}",
             exc_info=True,
         )
-
-        # Print separator after datasheet failure
         logger.info("-" * 70)
 
         return IngestionResult(
@@ -352,6 +535,7 @@ def ingest_batch(
             if result.is_success():
                 logger.info(
                     f"  [OK] Success: {result.chunks_created} chunks, "
+                    f"{result.tokens_inserted} tokens, "
                     f"{result.duration_seconds:.2f}s"
                 )
             elif result.is_skipped():

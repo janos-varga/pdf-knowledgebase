@@ -30,6 +30,7 @@ class Datasheet:
         component_type: Type of component (e.g., "op-amp", "microcontroller")
         error_message: Error details if status is "error"
         chunk_count: Number of chunks created (if successful)
+        token_count: Number of tokens processed (if successful)
         duration_seconds: Time taken for ingestion
     """
 
@@ -42,6 +43,7 @@ class Datasheet:
     component_type: str | None = None
     error_message: str | None = None
     chunk_count: int | None = None
+    token_count: int | None = None
     duration_seconds: float | None = None
 
     def __post_init__(self):
@@ -68,7 +70,7 @@ class Datasheet:
 
     @classmethod
     def from_folder(
-        cls, folder_path: Path, ingestion_timestamp: datetime = None
+        cls, folder_path: Path, ingestion_timestamp: datetime | None = None
     ) -> "Datasheet":
         """
         Create Datasheet from folder path.
@@ -136,6 +138,7 @@ class IngestionResult:
         status: Outcome (success/error/skipped)
         duration_seconds: Time taken for ingestion
         chunks_created: Number of chunks inserted (if successful)
+        tokens_inserted: Number of tokens inserted (if successful)
         error_message: Error details (if status is error)
         skipped_reason: Reason for skipping (if status is skipped)
     """
@@ -144,6 +147,7 @@ class IngestionResult:
     status: IngestionStatus
     duration_seconds: float
     chunks_created: int | None = None
+    tokens_inserted: int | None = None
     error_message: str | None = None
     skipped_reason: str | None = None
 

@@ -2606,6 +2606,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "langchain-openai" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ragas" },
@@ -2621,9 +2622,10 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "langchain-openai", specifier = ">=1.1.7" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ragas" },
+    { name = "ragas", specifier = ">=0.4.0" },
 ]
 
 [[package]]

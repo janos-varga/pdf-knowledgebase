@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.ingestion.chroma_client import ChromaDBClient
 from src.ingestion.pipeline import discover_datasheets, ingest_batch
+from src.models import BatchIngestionReport
 from src.utils.logger import setup_logging
 from src.utils.validators import validate_folder_path
 
@@ -209,6 +210,88 @@ def print_summary(report) -> None:
     logger.info("" + summary)
 
 
+def ingest(
+    datasheets_folder_path: Path,
+    chromadb_path: Path | None = None,
+    collection_name: str | None = None,
+    persist_db: bool = True,
+    force_update: bool = False,
+    **ingestion_params,
+) -> tuple[BatchIngestionReport, ChromaDBClient]:
+    """
+    Ingest datasheets into ChromaDB with comprehensive error handling.
+
+    This is the reusable ingestion function that can be called from CLI or
+    programmatically (e.g., from evaluation scripts).
+
+    Args:
+        datasheets_folder_path: Path to folder containing datasheet subfolders
+        chromadb_path: Optional ChromaDB storage path (uses default if None)
+        collection_name: Optional collection name (uses default if None)
+        persist_db: Whether to persist ChromaDB to disk (False for ephemeral)
+        force_update: If True, delete existing chunks before re-ingestion
+        **ingestion_params: Additional parameters passed to ingest_batch()
+                          (e.g., chunk_size, chunk_overlap)
+
+    Returns:
+        Tuple of (BatchIngestionReport, ChromaDBClient)
+
+    Raises:
+        FileNotFoundError: If datasheets folder doesn't exist
+        ValueError: If folder structure is invalid or no datasheets found
+        RuntimeError: If ChromaDB initialization or validation fails
+    """
+    # Get ChromaDB configuration if not provided
+    if chromadb_path is None or collection_name is None:
+        default_path, default_name = get_chromadb_config()
+        chromadb_path = chromadb_path or default_path
+        collection_name = collection_name or default_name
+
+    # Validate folder path
+    validate_folder_path(datasheets_folder_path)
+
+    # Discover datasheets
+    logger.info("Discovering datasheets...")
+    datasheets = discover_datasheets(datasheets_folder_path)
+
+    if not datasheets:
+        raise ValueError(
+            "No datasheets found. Each datasheet should be in its own subfolder with one .md file."
+        )
+
+    logger.info(f"Found {len(datasheets)} datasheets")
+
+    # Initialize ChromaDB client
+    logger.info("Initializing ChromaDB...")
+    chroma_client = ChromaDBClient(
+        chromadb_path=chromadb_path,
+        collection_name=collection_name,
+        persist_db=persist_db,
+    )
+
+    # Validate ChromaDB connection
+    is_valid, error_msg = chroma_client.validate_connection()
+    if not is_valid:
+        raise RuntimeError(f"ChromaDB validation failed: {error_msg}")
+
+    logger.info("ChromaDB initialized successfully")
+
+    # Run batch ingestion
+    logger.info("Starting batch ingestion...")
+    report = ingest_batch(
+        datasheets,
+        chroma_client,
+        force_update=force_update,
+        **ingestion_params,
+    )
+
+    logger.info(
+        f"Ingestion complete: {report.successful} successful, {report.failed} failed"
+    )
+
+    return report, chroma_client
+
+
 def main() -> int:
     """
     Main CLI entry point.
@@ -224,82 +307,21 @@ def main() -> int:
     logger.info("Datasheet ingestion CLI started")
 
     try:
-        # Get ChromaDB configuration
+        # Get ChromaDB configuration for banner
         chromadb_path, collection_name = get_chromadb_config()
 
         # Print banner
         print_banner(args, chromadb_path, collection_name)
 
-        # Validate folder path
+        # Run ingestion using refactored function
         folder_path = Path(args.datasheets_folder_path)
-        try:
-            validate_folder_path(folder_path)
-        except (FileNotFoundError, ValueError) as e:
-            logger.error(f"Validation error: {e}")
-            logger.error(f"[X] Error: {e}")
-            logger.error(
-                "Please provide a valid folder path containing datasheet subfolders."
-            )
-            return EXIT_VALIDATION_ERROR
-
-        # Discover datasheets
-        logger.info("Discovering datasheets...")
-        try:
-            datasheets = discover_datasheets(folder_path)
-        except (FileNotFoundError, ValueError) as e:
-            logger.error(f"Discovery error: {e}")
-            logger.error(f"[X] Error: {e}")
-            return EXIT_VALIDATION_ERROR
-
-        if not datasheets:
-            logger.warning("[!] No datasheets found in folder.")
-            logger.warning(
-                "   Each datasheet should be in its own subfolder with one .md file."
-            )
-            return EXIT_VALIDATION_ERROR
-
-        logger.info(f"Found {len(datasheets)} datasheets")
-
-        # Initialize ChromaDB client
-        logger.info("Initializing ChromaDB...")
-        try:
-            chroma_client = ChromaDBClient(
-                chromadb_path=chromadb_path,
-                collection_name=collection_name,
-                persist_db=not args.in_mem_chroma,
-            )
-        except RuntimeError as e:
-            logger.error(f"ChromaDB initialization error: {e}")
-            logger.error(f"[X] ChromaDB Error: {e}")
-            logger.error("Possible causes:")
-            logger.error("  - ChromaDB path is not accessible")
-            logger.error("  - Insufficient disk space")
-            logger.error("  - Permission denied")
-            return EXIT_CHROMADB_ERROR
-
-        # Validate ChromaDB connection
-        is_valid, error_msg = chroma_client.validate_connection()
-        if not is_valid:
-            logger.error(f"ChromaDB validation error: {error_msg}")
-            logger.error(f"[X] ChromaDB Validation Error: {error_msg}")
-            return EXIT_CHROMADB_ERROR
-
-        logger.info("ChromaDB initialized successfully")
-
-        # Run batch ingestion
-        logger.info("Starting batch ingestion...")
-        try:
-            report = ingest_batch(
-                datasheets,
-                chroma_client,
-                force_update=args.force_update,
-                chunk_size=args.chunk_size,
-                chunk_overlap=args.chunk_overlap,
-            )
-        except RuntimeError as e:
-            logger.error(f"Batch ingestion error: {e}")
-            logger.error(f"[X] Batch Ingestion Error: {e}")
-            return EXIT_INGESTION_ERROR
+        report, _ = ingest(
+            datasheets_folder_path=folder_path,
+            persist_db=not args.in_mem_chroma,
+            force_update=args.force_update,
+            chunk_size=args.chunk_size,
+            chunk_overlap=args.chunk_overlap,
+        )
 
         # Print summary
         print_summary(report)
@@ -313,6 +335,31 @@ def main() -> int:
             return EXIT_SUCCESS
         else:
             logger.warning("Batch completed with no successful ingestions")
+            return EXIT_INGESTION_ERROR
+
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"Validation error: {e}")
+        logger.error(f"[X] Error: {e}")
+        if isinstance(e, FileNotFoundError):
+            logger.error(
+                "Please provide a valid folder path containing datasheet subfolders."
+            )
+        return EXIT_VALIDATION_ERROR
+
+    except RuntimeError as e:
+        # Check if it's a ChromaDB error or ingestion error
+        error_msg = str(e)
+        if "ChromaDB" in error_msg or "validation failed" in error_msg:
+            logger.error(f"ChromaDB error: {e}")
+            logger.error(f"[X] ChromaDB Error: {e}")
+            logger.error("Possible causes:")
+            logger.error("  - ChromaDB path is not accessible")
+            logger.error("  - Insufficient disk space")
+            logger.error("  - Permission denied")
+            return EXIT_CHROMADB_ERROR
+        else:
+            logger.error(f"Batch ingestion error: {e}")
+            logger.error(f"[X] Batch Ingestion Error: {e}")
             return EXIT_INGESTION_ERROR
 
     except KeyboardInterrupt:
